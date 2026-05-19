@@ -301,6 +301,7 @@
             results.push([currentWheel.name, finalChoice]);
         }
 
+        // 當抽到地圖時的連動邏輯
         if (currentWheel.name === "地圖") {
             sharedMap = finalChoice;
             globalWheelsTemplate = baseWheels.filter(w => w.name !== "地圖");
@@ -318,10 +319,17 @@
                     });
                 });
             } else if (["絕航", "監獄"].includes(finalChoice)) {
+                // 【修改處】當地圖為 絕航 或 監獄 時，移除 0, 1, 2, 3 套，並確保有 6 套
                 [wheels, globalWheelsTemplate].forEach(wheelGroup => {
                     wheelGroup.forEach(w => {
-                        if (w.name === "裝備" && !w.items.includes("6套")) {
-                            w.items.push("6套");
+                        if (w.name === "裝備") {
+                            // 先加入 6套 (如果原本沒有的話)
+                            if (!w.items.includes("6套")) {
+                                w.items.push("6套");
+                            }
+                            // 過濾掉 0套、1套、2套、3套
+                            const removeArmorList = ["0套", "1套", "2套", "3套"];
+                            w.items = w.items.filter(armor => !removeArmorList.includes(armor));
                         }
                     });
                 });
