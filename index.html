@@ -97,7 +97,6 @@
             color: #888888;
             margin-top: 10px;
         }
-        /* 結算頁面樣式 */
         .results-container {
             max-width: 600px;
             background: #f0f0f0;
@@ -165,12 +164,9 @@
 </head>
 <body>
 
-<div id="app" class="container">
-    <!-- 這個區塊會由 JavaScript 動態渲染運作 -->
-</div>
+<div id="app" class="container"></div>
 
 <script>
-    // 原始數據
     const baseWheels = [
         {name: "地圖", items: ["機航", "絕航", "機壩", "普壩", "監獄", "巴克什", "長弓"]},
         {name: "角色", items: ["紅狼", "威龍", "無名", "張姐", "蠱", "蝶", "蜂醫", "老黑", "烏魯魯", "深藍", "比特", "露娜", "曉雯", "銀翼", "回響"]},
@@ -179,7 +175,6 @@
         {name: "槍", items: ["AR57", "MCX LT", "MK47", "KC17", "K437", "AS Val", "CAR-15", "PTR-32", "G3", "AK-12", "SG552", "M7", "AUG", "M16A4", "K416", "ASh-12", "AKS-74U", "AKM", "M4A1", "MK4", "QCQ171", "MP7", "勇士", "SR-3M", "SMG-45", "野牛", "UZI", "Vector", "P90", "MP5", "FS-12", "725雙管", "S12K", "M1014", "QJB-201", "M250", "N249", "PKM", "槓桿", "PGS-1", "SR9", "SR-25", "SKS", "M14", "SVD", "VSS", "Mini-14", "M82", "AWM", "M700", "R93", "SV-98", "M1911", "G17", "93R", "G18", "沙漠之鷹", ".357左輪", "QSZ92G", "複合弓"]}
     ];
 
-    // 全域變數狀態
     let playerCount = 1;
     let currentPlayer = 1;
     let allPlayersResults = {};
@@ -195,7 +190,6 @@
     let doubleGuns = false;
     let isSecondGun = false;
 
-    // 初始化介面
     function initUI() {
         const app = document.getElementById('app');
         app.className = "container";
@@ -223,7 +217,7 @@
 
     function initPlayerStage() {
         if (currentPlayer === 1) {
-            wheels = JSON.parse(JSON.stringify(baseWheels)); // 深拷貝
+            wheels = JSON.parse(JSON.stringify(baseWheels));
         } else {
             wheels = JSON.parse(JSON.stringify(globalWheelsTemplate));
         }
@@ -244,7 +238,6 @@
         document.getElementById('progressLabel').innerText = `${prefix}${Math.min(currentWheelIndex, totalGoal)} / ${totalGoal}`;
     }
 
-    // 模擬 Python 的時間延遲滾動效果
     async function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -253,7 +246,6 @@
         if (isSpinning) return;
 
         if (wheels.length === 0) {
-            // 禁用人數選擇
             const inputs = document.querySelectorAll('input[name="p_count"]');
             inputs.forEach(i => i.disabled = true);
             initPlayerStage();
@@ -282,19 +274,15 @@
             titleLabel.style.color = "#333333";
         }
 
-        // 滾動動畫效果
         const totalSteps = 25;
         for (let i = 0; i < totalSteps; i++) {
             let tempChoice = items[Math.floor(Math.random() * items.length)];
             displayLabel.innerText = tempChoice;
             displayLabel.style.color = "#2196F3";
-            
-            // 計算漸緩延遲
             let delay = 30 + Math.pow(i / totalSteps, 2) * 300;
             await sleep(delay);
         }
 
-        // 最終決定結果
         let finalChoice = items[Math.floor(Math.random() * items.length)];
 
         if (currentWheel.name === "槍") {
@@ -313,13 +301,11 @@
             results.push([currentWheel.name, finalChoice]);
         }
 
-        // 【地圖連動規則】
         if (currentWheel.name === "地圖") {
             sharedMap = finalChoice;
             globalWheelsTemplate = baseWheels.filter(w => w.name !== "地圖");
 
             if (["普壩", "長弓"].includes(finalChoice)) {
-                // 規則 A：移除5套與特定槍枝
                 [wheels, globalWheelsTemplate].forEach(wheelGroup => {
                     wheelGroup.forEach(w => {
                         if (w.name === "裝備") {
@@ -332,7 +318,6 @@
                     });
                 });
             } else if (["絕航", "監獄"].includes(finalChoice)) {
-                // 💡 核心規則 1：無論是否跑刀，只要抽到絕航/監獄，先塞入 6套
                 [wheels, globalWheelsTemplate].forEach(wheelGroup => {
                     wheelGroup.forEach(w => {
                         if (w.name === "裝備" && !w.items.includes("6套")) {
@@ -343,11 +328,9 @@
             }
         }
 
-        // 【玩法連動規則】
         if (currentWheel.name === "玩法") {
             if (finalChoice === "跑刀") {
                 skipGunWheel = true;
-                // 💡 核心規則 2：只有抽到跑刀時，才移除 0~4 套
                 if (["絕航", "監獄"].includes(sharedMap)) {
                     wheels.forEach(w => { if(w.name === "裝備") w.items = ["5套", "6套"]; });
                     globalWheelsTemplate.forEach(w => { if(w.name === "裝備") w.items = ["5套", "6套"]; });
@@ -361,13 +344,10 @@
 
         currentWheelIndex++;
         updateProgressText();
-        
-        // 延遲 1.5 秒進入下一階段
         setTimeout(nextStage, 1500);
     }
 
     function nextStage() {
-        // 如果開啟跑刀，自動跳過「槍」轉盤
         if (skipGunWheel && currentWheelIndex < wheels.length) {
             if (wheels[currentWheelIndex].name === "槍") {
                 currentWheelIndex++;
@@ -403,7 +383,6 @@
             }
             isSpinning = false;
         } else {
-            // 儲存當前玩家資料
             allPlayersResults[currentPlayer] = {results: results, skipGun: skipGunWheel};
 
             if (currentPlayer < playerCount) {
@@ -481,11 +460,9 @@
         skipGunWheel = false;
         doubleGuns = false;
         isSecondGun = false;
-        
         initUI();
     }
 
-    // 啟動網頁
     initUI();
 </script>
 
