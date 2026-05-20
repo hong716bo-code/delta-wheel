@@ -30,7 +30,6 @@
             padding: 15px;
             margin-bottom: 15px;
             background-color: #f8f8f8;
-            animation: fadeIn 0.4s ease-out forwards;
         }
         .player-frame legend {
             font-weight: bold;
@@ -60,15 +59,10 @@
             background: #eef;
             border-color: #2196F3;
         }
-        /* 隱藏原生 radio，改用好看的點選效果 */
-        .radio-group input[type="radio"] {
-            margin: 0;
-        }
         
-        /* 轉盤介面容器 - 預設隱藏 */
-        .wheel-interface {
+        /* 預設隱藏的區塊 */
+        #map_zone, #wheel_zone {
             display: none;
-            animation: fadeIn 0.5s ease-out forwards;
         }
         
         h2 {
@@ -93,7 +87,6 @@
             font-size: 24px;
             color: #666666;
             font-weight: normal;
-            transition: color 0.1s;
         }
         .spin-button {
             font-size: 18px;
@@ -186,16 +179,45 @@
             border-radius: 4px;
             cursor: pointer;
         }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
     </style>
 </head>
 <body>
 
-<div id="app" class="container"></div>
+<div id="app" class="container">
+    <!-- 第一步：選擇人數 -->
+    <fieldset class="player-frame" id="step_player">
+        <legend>👥 第一步：選擇隊伍人數</legend>
+        <div class="radio-group">
+            <label><input type="radio" name="p_count" value="1" onchange="selectPlayerCount(1)"> 1 人</label>
+            <label><input type="radio" name="p_count" value="2" onchange="selectPlayerCount(2)"> 2 人</label>
+            <label><input type="radio" name="p_count" value="3" onchange="selectPlayerCount(3)"> 3 人</label>
+        </div>
+    </fieldset>
+    
+    <!-- 第二步：地圖種類（預設隱藏） -->
+    <div id="map_zone">
+        <fieldset class="player-frame" id="step_map">
+            <legend>🗺️ 第二步：選擇地圖種類</legend>
+            <div class="radio-group">
+                <label><input type="radio" name="map_cat" value="機密" onchange="selectMapCategory('機密')"> 機密</label>
+                <label><input type="radio" name="map_cat" value="常規" onchange="selectMapCategory('常規')"> 常規</label>
+                <label><input type="radio" name="map_cat" value="絕密" onchange="selectMapCategory('絕密')"> 絕密</label>
+                <label><input type="radio" name="map_cat" value="全圖" onchange="selectMapCategory('全圖')"> 全圖</label>
+            </div>
+        </fieldset>
+    </div>
+
+    <!-- 第三步：轉盤主介面（預設隱藏） -->
+    <div id="wheel_zone">
+        <hr style="border: 1px dashed #ccc; margin: 20px 0;">
+        <h2 id="titleLabel">配置已就緒</h2>
+        <div class="wheel-frame">
+            <div id="displayLabel" class="display-label">點擊下方按鈕開始隨機</div>
+        </div>
+        <button id="spinButton" class="spin-button" onclick="startSpin()">🎲 開始隨機出裝</button>
+        <div id="progressLabel" class="progress-label">等待開始...</div>
+    </div>
+</div>
 
 <script>
     const baseWheels = [
@@ -229,77 +251,37 @@
     let doubleGuns = false;
     let isSecondGun = false;
 
-    // 步驟 1: 初始化，只顯示人數選擇
-    function initUI() {
-        const app = document.getElementById('app');
-        app.className = "container";
-        app.innerHTML = `
-            <fieldset class="player-frame" id="step_player">
-                <legend>👥 第一步：選擇隊伍人數</legend>
-                <div class="radio-group">
-                    <label><input type="radio" name="p_count" value="1" onchange="selectPlayerCount(1)"> 1 人</label>
-                    <label><input type="radio" name="p_count" value="2" onchange="selectPlayerCount(2)"> 2 人</label>
-                    <label><input type="radio" name="p_count" value="3" onchange="selectPlayerCount(3)"> 3 人</label>
-                </div>
-            </fieldset>
-            
-            <div id="map_zone"></div>
-            <div id="wheel_zone" class="wheel-interface"></div>
-        `;
-    }
-
-    // 步驟 2: 選完人數，動態生成地圖種類選擇
+    // 觸發步驟 2
     function selectPlayerCount(val) {
         playerCount = val;
         
-        // 鎖定人數選擇，避免中途亂改
+        // 鎖定人數選項
         document.querySelectorAll('input[name="p_count"]').forEach(i => {
             if(!i.checked) i.parentElement.style.opacity = "0.5";
             i.disabled = true;
         });
 
-        const mapZone = document.getElementById('map_zone');
-        mapZone.innerHTML = `
-            <fieldset class="player-frame" id="step_map">
-                <legend>🗺️ 第二步：選擇地圖種類</legend>
-                <div class="radio-group">
-                    <label><input type="radio" name="map_cat" value="機密" onchange="selectMapCategory('機密')"> 機密</label>
-                    <label><input type="radio" name="map_cat" value="常規" onchange="selectMapCategory('常規')"> 常規</label>
-                    <label><input type="radio" name="map_cat" value="絕密" onchange="selectMapCategory('絕密')"> 絕密</label>
-                    <label><input type="radio" name="map_cat" value="全圖" onchange="selectMapCategory('全圖')"> 全圖</label>
-                </div>
-            </fieldset>
-        `;
+        // 顯示地圖種類區塊
+        document.getElementById('map_zone').style.display = "block";
     }
 
-    // 步驟 3: 選完地圖種類，顯示轉盤主介面
+    // 觸發步驟 3
     function selectMapCategory(val) {
         selectedMapCategory = val;
 
-        // 鎖定地圖選擇
+        // 鎖定地圖選項
         document.querySelectorAll('input[name="map_cat"]').forEach(i => {
             if(!i.checked) i.parentElement.style.opacity = "0.5";
             i.disabled = true;
         });
 
-        const wheelZone = document.getElementById('wheel_zone');
-        wheelZone.innerHTML = `
-            <hr style="border: 1px dashed #ccc; margin: 20px 0;">
-            <h2 id="titleLabel">配置已就緒</h2>
-            <div class="wheel-frame">
-                <div id="displayLabel" class="display-label">點擊下方按鈕開始隨機</div>
-            </div>
-            <button id="spinButton" class="spin-button" onclick="startSpin()">🎲 開始隨機出裝</button>
-            <div id="progressLabel" class="progress-label">等待開始...</div>
-        `;
         // 顯示轉盤介面
-        wheelZone.style.display = "block";
+        document.getElementById('wheel_zone').style.display = "block";
     }
 
     function initPlayerStage() {
         if (currentPlayer === 1) {
             wheels = JSON.parse(JSON.stringify(baseWheels));
-            // 依據選擇的種類，將地圖池子替換掉
             const mapWheel = wheels.find(w => w.name === "地圖");
             if (mapWheel) {
                 mapWheel.items = mapCategories[selectedMapCategory];
@@ -385,7 +367,6 @@
             results.push([currentWheel.name, finalChoice]);
         }
 
-        // 地圖連動邏輯
         if (currentWheel.name === "地圖") {
             sharedMap = finalChoice;
             globalWheelsTemplate = wheels.filter(w => w.name !== "地圖");
@@ -417,7 +398,6 @@
             }
         }
 
-        // 玩法連動邏輯
         if (currentWheel.name === "玩法") {
             if (finalChoice === "跑刀") {
                 skipGunWheel = true;
@@ -549,6 +529,7 @@
     }
 
     function resetGame() {
+        // 還原狀態
         playerCount = null;
         selectedMapCategory = null;
         currentPlayer = 1;
@@ -562,10 +543,21 @@
         skipGunWheel = false;
         doubleGuns = false;
         isSecondGun = false;
-        initUI();
-    }
 
-    initUI();
+        // 重設輸入框狀態
+        document.querySelectorAll('input[type="radio"]').forEach(i => {
+            i.checked = false;
+            i.disabled = false;
+            i.parentElement.style.opacity = "1";
+        });
+
+        // 重置區塊顯示
+        document.getElementById('map_zone').style.display = "none";
+        document.getElementById('wheel_zone').style.display = "none";
+        
+        const app = document.getElementById('app');
+        app.className = "container";
+    }
 </script>
 
 </body>
