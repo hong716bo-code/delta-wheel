@@ -60,7 +60,7 @@
             border-color: #2196F3;
         }
         
-        /* 預設隱藏的區塊 */
+        /* 初始隱藏區塊 */
         #map_zone, #wheel_zone {
             display: none;
         }
@@ -74,25 +74,37 @@
         }
         .wheel-frame {
             width: 350px;
-            height: 100px;
+            height: 180px; /* 預留高度給角色頭像 */
             background: #ffffff;
             border: 2px solid #cccccc;
             margin: 0 auto 15px auto;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             border-radius: 4px;
+            padding: 10px;
+            box-sizing: border-box;
         }
         .display-label {
             font-size: 24px;
             color: #666666;
             font-weight: normal;
+            margin-top: 5px;
+        }
+        .avatar-img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 2px solid #2196F3;
+            margin-bottom: 5px;
         }
         .spin-button {
             font-size: 18px;
             font-weight: bold;
             color: white;
-            background-color: #4CAF50;
+            background-color: #4CAF50; /* 預設亮綠色，絕對不卡死 */
             border: none;
             padding: 12px 24px;
             border-radius: 4px;
@@ -151,7 +163,7 @@
             background: white;
             border: 2px groove #dddddd;
             border-radius: 5px;
-            padding: 10px;
+            padding: 12px;
             text-align: left;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
@@ -169,6 +181,15 @@
             line-height: 1.6;
             white-space: pre-line;
         }
+        .result-avatar {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            margin-top: 5px;
+            display: block;
+        }
         .reset-button {
             font-size: 16px;
             font-weight: bold;
@@ -184,7 +205,6 @@
 <body>
 
 <div id="app" class="container">
-    <!-- 第一步：選擇人數 -->
     <fieldset class="player-frame" id="step_player">
         <legend>👥 第一步：選擇隊伍人數</legend>
         <div class="radio-group">
@@ -194,7 +214,6 @@
         </div>
     </fieldset>
     
-    <!-- 第二步：地圖種類（預設隱藏） -->
     <div id="map_zone">
         <fieldset class="player-frame" id="step_map">
             <legend>🗺️ 第二步：選擇地圖種類</legend>
@@ -207,358 +226,26 @@
         </fieldset>
     </div>
 
-    <!-- 第三步：轉盤主介面（預設隱藏） -->
     <div id="wheel_zone">
         <hr style="border: 1px dashed #ccc; margin: 20px 0;">
         <h2 id="titleLabel">配置已就緒</h2>
-        <div class="wheel-frame">
-            <div id="displayLabel" class="display-label">點擊下方按鈕開始隨機</div>
+        <div class="wheel-frame" id="wheelFrameBox">
+            <div id="displayLabel" class="display-label">準備好隨裝了嗎？</div>
         </div>
         <button id="spinButton" class="spin-button" onclick="startSpin()">🎲 開始隨機出裝</button>
-        <div id="progressLabel" class="progress-label">等待開始...</div>
+        <div id="progressLabel" class="progress-label">進度: 0 / 5</div>
     </div>
 </div>
 
 <script>
-    const baseWheels = [
-        {name: "地圖", items: ["機航", "絕航", "機壩", "普壩", "監獄", "巴克什", "長弓"]},
-        {name: "角色", items: ["紅狼", "威龍", "無名", "張姐", "蠱", "蝶", "蜂醫", "老黑", "烏魯魯", "深藍", "比特", "露娜", "曉雯", "銀翼", "回響"]},
-        {name: "玩法", items: ["雙槍", "一把", "跑刀"]},
-        {name: "裝備", items: ["0套", "1套", "2套", "3套", "4套", "5套"]},
-        {name: "槍", items: ["AR57", "MCX LT", "MK47", "KC17", "K437", "AS Val", "CAR-15", "PTR-32", "G3", "AK-12", "SG552", "M7", "AUG", "M16A4", "K416", "ASh-12", "AKS-74U", "AKM", "M4A1", "MK4", "QCQ171", "MP7", "勇士", "SR-3M", "SMG-45", "野牛", "UZI", "Vector", "P90", "MP5", "FS-12", "725雙管", "S12K", "M1014", "QJB-201", "M250", "N249", "PKM", "槓桿", "PGS-1", "SR9", "SR-25", "SKS", "M14", "SVD", "VSS", "Mini-14", "M82", "AWM", "M700", "R93", "SV-98", "M1911", "G17", "93R", "G18", "沙漠之鷹", ".357左輪", "QSZ92G", "複合弓"]}
-    ];
-
-    const mapCategories = {
-        "機密": ["機壩", "機航", "巴克什"],
-        "常規": ["普壩", "長弓"],
-        "絕密": ["監獄", "絕航"],
-        "全圖": ["機壩", "機航", "巴克什", "普壩", "長弓", "監獄", "絕航"]
-    };
-
-    let playerCount = null;
-    let selectedMapCategory = null;
-    let currentPlayer = 1;
-    let allPlayersResults = {};
-    let sharedMap = null;
-    let globalWheelsTemplate = null;
-
-    let wheels = [];
-    let currentWheelIndex = 0;
-    let results = [];
-    let isSpinning = false;
-
-    let skipGunWheel = false;
-    let doubleGuns = false;
-    let isSecondGun = false;
-
-    // 觸發步驟 2
-    function selectPlayerCount(val) {
-        playerCount = val;
-        
-        // 鎖定人數選項
-        document.querySelectorAll('input[name="p_count"]').forEach(i => {
-            if(!i.checked) i.parentElement.style.opacity = "0.5";
-            i.disabled = true;
-        });
-
-        // 顯示地圖種類區塊
-        document.getElementById('map_zone').style.display = "block";
-    }
-
-    // 觸發步驟 3
-    function selectMapCategory(val) {
-        selectedMapCategory = val;
-
-        // 鎖定地圖選項
-        document.querySelectorAll('input[name="map_cat"]').forEach(i => {
-            if(!i.checked) i.parentElement.style.opacity = "0.5";
-            i.disabled = true;
-        });
-
-        // 顯示轉盤介面
-        document.getElementById('wheel_zone').style.display = "block";
-    }
-
-    function initPlayerStage() {
-        if (currentPlayer === 1) {
-            wheels = JSON.parse(JSON.stringify(baseWheels));
-            const mapWheel = wheels.find(w => w.name === "地圖");
-            if (mapWheel) {
-                mapWheel.items = mapCategories[selectedMapCategory];
-            }
-        } else {
-            wheels = JSON.parse(JSON.stringify(globalWheelsTemplate));
-        }
-        currentWheelIndex = 0;
-        results = [];
-        skipGunWheel = false;
-        doubleGuns = false;
-        isSecondGun = false;
-        updateProgressText();
-    }
-
-    function updateProgressText() {
-        const totalGoal = wheels.length ? wheels.length : 5;
-        let prefix = "進度: ";
-        if (playerCount > 1 && wheels.length > 0 && wheels[Math.max(0, currentWheelIndex - 1)].name !== "地圖") {
-            prefix = `玩家 ${currentPlayer} 進度: `;
-        }
-        document.getElementById('progressLabel').innerText = `${prefix}${Math.min(currentWheelIndex, totalGoal)} / ${totalGoal}`;
-    }
-
-    async function sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    async function startSpin() {
-        if (isSpinning) return;
-
-        if (wheels.length === 0) {
-            initPlayerStage();
-        }
-
-        isSpinning = true;
-        const spinButton = document.getElementById('spinButton');
-        spinButton.disabled = true;
-
-        const titleLabel = document.getElementById('titleLabel');
-        const displayLabel = document.getElementById('displayLabel');
-
-        let currentWheel = wheels[currentWheelIndex];
-        let items = currentWheel.items;
-
-        if (playerCount > 1) {
-            if (currentWheel.name === "地圖") {
-                titleLabel.innerText = `【全隊共用】${currentWheel.name}`;
-                titleLabel.style.color = "#FF9800";
-            } else {
-                titleLabel.innerText = `【玩家 ${currentPlayer}】${currentWheel.name}`;
-                titleLabel.style.color = "#009688";
-            }
-        } else {
-            titleLabel.innerText = currentWheel.name;
-            titleLabel.style.color = "#333333";
-        }
-
-        const totalSteps = 25;
-        for (let i = 0; i < totalSteps; i++) {
-            let tempChoice = items[Math.floor(Math.random() * items.length)];
-            displayLabel.innerText = tempChoice;
-            displayLabel.style.color = "#2196F3";
-            let delay = 30 + Math.pow(i / totalSteps, 2) * 300;
-            await sleep(delay);
-        }
-
-        let finalChoice = items[Math.floor(Math.random() * items.length)];
-
-        if (currentWheel.name === "槍") {
-            if (isSecondGun) {
-                displayLabel.innerText = `✨ 副武器：${finalChoice} ✨`;
-                displayLabel.style.color = "#FF5722";
-                results.push(["槍 (副武器)", finalChoice]);
-            } else {
-                displayLabel.innerText = `✨ 主武器：${finalChoice} ✨`;
-                displayLabel.style.color = "#E91E63";
-                results.push(["槍 (主武器)", finalChoice]);
-            }
-        } else {
-            displayLabel.innerText = `✨ ${finalChoice} ✨`;
-            displayLabel.style.color = "#E91E63";
-            results.push([currentWheel.name, finalChoice]);
-        }
-
-        if (currentWheel.name === "地圖") {
-            sharedMap = finalChoice;
-            globalWheelsTemplate = wheels.filter(w => w.name !== "地圖");
-
-            if (["普壩", "長弓"].includes(finalChoice)) {
-                [wheels, globalWheelsTemplate].forEach(wheelGroup => {
-                    wheelGroup.forEach(w => {
-                        if (w.name === "裝備") {
-                            w.items = w.items.filter(i => i !== "5套");
-                        }
-                        if (w.name === "槍") {
-                            const removeList = ["M7", "AWM", "M82", "M250"];
-                            w.items = w.items.filter(gun => !removeList.includes(gun));
-                        }
-                    });
-                });
-            } else if (["絕航", "監獄"].includes(finalChoice)) {
-                [wheels, globalWheelsTemplate].forEach(wheelGroup => {
-                    wheelGroup.forEach(w => {
-                        if (w.name === "裝備") {
-                            if (!w.items.includes("6套")) {
-                                w.items.push("6套");
-                            }
-                            const removeArmorList = ["0套", "1套", "2套", "3套"];
-                            w.items = w.items.filter(armor => !removeArmorList.includes(armor));
-                        }
-                    });
-                });
-            }
-        }
-
-        if (currentWheel.name === "玩法") {
-            if (finalChoice === "跑刀") {
-                skipGunWheel = true;
-                
-                if (["絕航", "監獄"].includes(sharedMap)) {
-                    wheels.forEach(w => { if(w.name === "裝備") w.items = ["5套", "6套"]; });
-                    globalWheelsTemplate.forEach(w => { if(w.name === "裝備") w.items = ["5套", "6套"]; });
-                } 
-                else if (["機航", "機壩", "巴克什"].includes(sharedMap)) {
-                    const removeKnifeArmor = ["0套", "1套", "2套"];
-                    [wheels, globalWheelsTemplate].forEach(wheelGroup => {
-                        wheelGroup.forEach(w => {
-                            if (w.name === "裝備") {
-                                w.items = w.items.filter(armor => !removeKnifeArmor.includes(armor));
-                            }
-                        });
-                    });
-                }
-            } else if (finalChoice === "雙槍") {
-                doubleGuns = true;
-                let gunWheel = wheels.find(w => w.name === "槍");
-                wheels.push({name: "槍", items: gunWheel.items});
-            }
-        }
-
-        currentWheelIndex++;
-        updateProgressText();
-        setTimeout(nextStage, 1500);
-    }
-
-    function nextStage() {
-        if (skipGunWheel && currentWheelIndex < wheels.length) {
-            if (wheels[currentWheelIndex].name === "槍") {
-                currentWheelIndex++;
-                updateProgressText();
-                nextStage();
-                return;
-            }
-        }
-
-        const titleLabel = document.getElementById('titleLabel');
-        const displayLabel = document.getElementById('displayLabel');
-        const spinButton = document.getElementById('spinButton');
-
-        if (currentWheelIndex < wheels.length) {
-            let nextWheel = wheels[currentWheelIndex];
-            let titlePrefix = playerCount > 1 ? `【玩家 ${currentPlayer}】` : "";
-
-            if (nextWheel.name === "槍" && doubleGuns && currentWheelIndex === wheels.length - 1) {
-                isSecondGun = true;
-                titleLabel.innerText = `${titlePrefix}槍 (第二把副武器)`;
-                displayLabel.innerText = "請點擊轉取第二把槍！";
-                displayLabel.style.color = "#666666";
-                spinButton.disabled = false;
-                spinButton.style.backgroundColor = "#FF5722";
-                spinButton.innerText = "🎲 轉取副武器";
-            } else {
-                titleLabel.innerText = `${titlePrefix}${nextWheel.name}`;
-                displayLabel.innerText = "準備好轉下一個了嗎？";
-                displayLabel.style.color = "#666666";
-                spinButton.disabled = false;
-                spinButton.style.backgroundColor = "#4CAF50";
-                spinButton.innerText = "🎲 開始旋轉";
-            }
-            isSpinning = false;
-        } else {
-            allPlayersResults[currentPlayer] = {results: results, skipGun: skipGunWheel};
-
-            if (currentPlayer < playerCount) {
-                currentPlayer++;
-                isSpinning = false;
-                initPlayerStage();
-
-                titleLabel.innerText = `輪到 玩家 ${currentPlayer}`;
-                titleLabel.style.color = "#009688";
-                displayLabel.innerText = `請玩家 ${currentPlayer} 準備好後點擊按鈕`;
-                displayLabel.style.color = "#666666";
-                spinButton.disabled = false;
-                spinButton.style.backgroundColor = "#009688";
-                spinButton.innerText = `🎲 開始抽玩家 ${currentPlayer}`;
-            } else {
-                showFinalResults();
-            }
-        }
-    }
-
-    function showFinalResults() {
-        const app = document.getElementById('app');
-        app.className = "container results-container";
-        
-        let html = `
-            <div class="result-title">🎉 本局隊伍出裝配置 🎉</div>
-            <div class="map-title">🗺️ 出戰地圖 [${selectedMapCategory}] ➔ ${sharedMap}</div>
-            <div class="main-result-frame">
-        `;
-
-        for (let p_idx = 1; p_idx <= playerCount; p_idx++) {
-            let pData = allPlayersResults[p_idx];
-            html += `
-                <div class="p-frame">
-                    <div class="p-frame-title"> 玩家 ${p_idx} </div>
-                    <div class="p-text">`;
-            
-            if (playerCount === 1) {
-                html += `• 地圖 ➔ ${sharedMap}\n`;
-            }
-
-            pData.results.forEach(res => {
-                if (!["玩法", "地圖"].includes(res[0])) {
-                    html += `• ${res[0]} ➔ ${res[1]}\n`;
-                }
-            });
-
-            if (pData.skipGun) {
-                html += `• 槍 ➔ 🚫 跑刀模式\n`;
-            }
-
-            html += `   </div>
-                </div>
-            `;
-        }
-
-        html += `
-            </div>
-            <button class="reset-button" onclick="resetGame()">🔄 重新生成配置</button>
-        `;
-
-        app.innerHTML = html;
-    }
-
-    function resetGame() {
-        // 還原狀態
-        playerCount = null;
-        selectedMapCategory = null;
-        currentPlayer = 1;
-        allPlayersResults = {};
-        sharedMap = null;
-        globalWheelsTemplate = null;
-        wheels = [];
-        currentWheelIndex = 0;
-        results = [];
-        isSpinning = false;
-        skipGunWheel = false;
-        doubleGuns = false;
-        isSecondGun = false;
-
-        // 重設輸入框狀態
-        document.querySelectorAll('input[type="radio"]').forEach(i => {
-            i.checked = false;
-            i.disabled = false;
-            i.parentElement.style.opacity = "1";
-        });
-
-        // 重置區塊顯示
-        document.getElementById('map_zone').style.display = "none";
-        document.getElementById('wheel_zone').style.display = "none";
-        
-        const app = document.getElementById('app');
-        app.className = "container";
-    }
-</script>
-
-</body>
-</html>
+    // 角色圖片設定表
+    const characterImages = {
+        "紅狼": "https://i.imgur.com/vH28TfO.png", // 這裡放入您上傳的紅狼圖片網址
+        "威龍": "https://via.placeholder.com/100/333/fff?text=威龍", 
+        "無名": "https://via.placeholder.com/100/333/fff?text=無名",
+        "張姐": "https://via.placeholder.com/100/333/fff?text=張姐",
+        "蠱": "https://via.placeholder.com/100/333/fff?text=蠱",
+        "蝶": "https://via.placeholder.com/100/333/fff?text=蝶",
+        "蜂醫": "https://via.placeholder.com/100/333/fff?text=蜂醫",
+        "老黑": "https://via.placeholder.com/100/333/fff?text=老黑",
+        "烏魯魯": "
