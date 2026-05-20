@@ -23,6 +23,11 @@
             padding: 10px;
             border-radius: 8px;
             text-align: center;
+            transition: max-width 0.3s ease;
+        }
+        /* 轉為結果頁面時放寬容器 */
+        .results-mode {
+            max-width: 600px;
         }
         .player-frame {
             border: 2px groove #dddddd;
@@ -61,7 +66,7 @@
         }
         
         /* 預設隱藏的區塊 */
-        #map_zone, #wheel_zone {
+        #map_zone, #wheel_zone, #results_zone {
             display: none;
         }
         
@@ -115,11 +120,6 @@
             font-size: 15px;
             color: #888888;
             margin-top: 10px;
-        }
-        .results-container {
-            max-width: 600px;
-            background: #f0f0f0;
-            width: 100%;
         }
         .result-title {
             font-size: 26px;
@@ -184,39 +184,45 @@
 <body>
 
 <div id="app" class="container">
-    <!-- 第一步：選擇人數 -->
-    <fieldset class="player-frame" id="step_player">
-        <legend>👥 第一步：選擇隊伍人數</legend>
-        <div class="radio-group">
-            <label><input type="radio" name="p_count" value="1" onchange="selectPlayerCount(1)"> 1 人</label>
-            <label><input type="radio" name="p_count" value="2" onchange="selectPlayerCount(2)"> 2 人</label>
-            <label><input type="radio" name="p_count" value="3" onchange="selectPlayerCount(3)"> 3 人</label>
-        </div>
-    </fieldset>
-    
-    <!-- 第二步：地圖種類（預設隱藏） -->
-    <div id="map_zone">
-        <fieldset class="player-frame" id="step_map">
-            <legend>🗺️ 第二步：選擇地圖種類</legend>
+    <!-- 包裹設定與轉盤的控制區塊 -->
+    <div id="control_zone">
+        <!-- 第一步：選擇人數 -->
+        <fieldset class="player-frame" id="step_player">
+            <legend>👥 第一步：選擇隊伍人數</legend>
             <div class="radio-group">
-                <label><input type="radio" name="map_cat" value="機密" onchange="selectMapCategory('機密')"> 機密</label>
-                <label><input type="radio" name="map_cat" value="常規" onchange="selectMapCategory('常規')"> 常規</label>
-                <label><input type="radio" name="map_cat" value="絕密" onchange="selectMapCategory('絕密')"> 絕密</label>
-                <label><input type="radio" name="map_cat" value="全圖" onchange="selectMapCategory('全圖')"> 全圖</label>
+                <label><input type="radio" name="p_count" value="1" onchange="selectPlayerCount(1)"> 1 人</label>
+                <label><input type="radio" name="p_count" value="2" onchange="selectPlayerCount(2)"> 2 人</label>
+                <label><input type="radio" name="p_count" value="3" onchange="selectPlayerCount(3)"> 3 人</label>
             </div>
         </fieldset>
+        
+        <!-- 第二步：地圖種類 -->
+        <div id="map_zone">
+            <fieldset class="player-frame" id="step_map">
+                <legend>🗺️ 第二步：選擇地圖種類</legend>
+                <div class="radio-group">
+                    <label><input type="radio" name="map_cat" value="機密" onchange="selectMapCategory('機密')"> 機密</label>
+                    <label><input type="radio" name="map_cat" value="常規" onchange="selectMapCategory('常規')"> 常規</label>
+                    <label><input type="radio" name="map_cat" value="絕密" onchange="selectMapCategory('絕密')"> 絕密</label>
+                    <label><input type="radio" name="map_cat" value="全圖" onchange="selectMapCategory('全圖')"> 全圖</label>
+                </div>
+            </fieldset>
+        </div>
+
+        <!-- 第三步：轉盤主介面 -->
+        <div id="wheel_zone">
+            <hr style="border: 1px dashed #ccc; margin: 20px 0;">
+            <h2 id="titleLabel">配置已就緒</h2>
+            <div class="wheel-frame">
+                <div id="displayLabel" class="display-label">點擊下方按鈕開始隨機</div>
+            </div>
+            <button id="spinButton" class="spin-button" onclick="startSpin()">🎲 開始隨機出裝</button>
+            <div id="progressLabel" class="progress-label">等待開始...</div>
+        </div>
     </div>
 
-    <!-- 第三步：轉盤主介面（預設隱藏） -->
-    <div id="wheel_zone">
-        <hr style="border: 1px dashed #ccc; margin: 20px 0;">
-        <h2 id="titleLabel">配置已就緒</h2>
-        <div class="wheel-frame">
-            <div id="displayLabel" class="display-label">點擊下方按鈕開始隨機</div>
-        </div>
-        <button id="spinButton" class="spin-button" onclick="startSpin()">🎲 開始隨機出裝</button>
-        <div id="progressLabel" class="progress-label">等待開始...</div>
-    </div>
+    <!-- 專門用來塞結果的獨立區塊，不會破壞原本的 HTML 結構 -->
+    <div id="results_zone"></div>
 </div>
 
 <script>
@@ -251,31 +257,21 @@
     let doubleGuns = false;
     let isSecondGun = false;
 
-    // 觸發步驟 2
     function selectPlayerCount(val) {
         playerCount = val;
-        
-        // 鎖定人數選項
         document.querySelectorAll('input[name="p_count"]').forEach(i => {
             if(!i.checked) i.parentElement.style.opacity = "0.5";
             i.disabled = true;
         });
-
-        // 顯示地圖種類區塊
         document.getElementById('map_zone').style.display = "block";
     }
 
-    // 觸發步驟 3
     function selectMapCategory(val) {
         selectedMapCategory = val;
-
-        // 鎖定地圖選項
         document.querySelectorAll('input[name="map_cat"]').forEach(i => {
             if(!i.checked) i.parentElement.style.opacity = "0.5";
             i.disabled = true;
         });
-
-        // 顯示轉盤介面
         document.getElementById('wheel_zone').style.display = "block";
     }
 
@@ -485,8 +481,11 @@
     }
 
     function showFinalResults() {
+        // 隱藏設定與控制元件，不刪除它們
+        document.getElementById('control_zone').style.display = "none";
+        
         const app = document.getElementById('app');
-        app.className = "container results-container";
+        app.classList.add("results-mode");
         
         let html = `
             <div class="result-title">🎉 本局隊伍出裝配置 🎉</div>
@@ -525,11 +524,13 @@
             <button class="reset-button" onclick="resetGame()">🔄 重新生成配置</button>
         `;
 
-        app.innerHTML = html;
+        const resultsZone = document.getElementById('results_zone');
+        resultsZone.innerHTML = html;
+        resultsZone.style.display = "block"; // 顯示結果
     }
 
     function resetGame() {
-        // 還原狀態
+        // 還原狀態數據
         playerCount = null;
         selectedMapCategory = null;
         currentPlayer = 1;
@@ -544,19 +545,36 @@
         doubleGuns = false;
         isSecondGun = false;
 
-        // 重設輸入框狀態
+        // 重設轉盤內部的文字與按鈕狀態
+        document.getElementById('titleLabel').innerText = "配置已就緒";
+        document.getElementById('titleLabel').style.color = "#333333";
+        document.getElementById('displayLabel').innerText = "點擊下方按鈕開始隨機";
+        document.getElementById('displayLabel').style.color = "#666666";
+        
+        const spinButton = document.getElementById('spinButton');
+        spinButton.disabled = false;
+        spinButton.style.backgroundColor = "#4CAF50";
+        spinButton.innerText = "🎲 開始隨機出裝";
+        document.getElementById('progressLabel').innerText = "等待開始...";
+
+        // 還原單選框狀態
         document.querySelectorAll('input[type="radio"]').forEach(i => {
             i.checked = false;
             i.disabled = false;
             i.parentElement.style.opacity = "1";
         });
 
-        // 重置區塊顯示
+        // 隱藏結果區塊，重新顯示控制與設定區塊
+        const resultsZone = document.getElementById('results_zone');
+        resultsZone.innerHTML = "";
+        resultsZone.style.display = "none";
+        
         document.getElementById('map_zone').style.display = "none";
         document.getElementById('wheel_zone').style.display = "none";
+        document.getElementById('control_zone').style.display = "block";
         
         const app = document.getElementById('app');
-        app.className = "container";
+        app.classList.remove("results-mode");
     }
 </script>
 
