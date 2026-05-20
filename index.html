@@ -217,7 +217,8 @@
 </div>
 
 <script>
-    const baseWheels = [
+    // 固定的原始資料，絕對不去改動它
+    const baseWheelsData = [
         {name: "地圖", items: ["機航", "絕航", "機壩", "普壩", "監獄", "巴克什", "長弓"]},
         {name: "角色", items: ["紅狼", "威龍", "無名", "張姐", "蠱", "蝶", "蜂醫", "老黑", "烏魯魯", "深藍", "比特", "露娜", "曉雯", "銀翼", "回響"]},
         {name: "玩法", items: ["雙槍", "一把", "跑刀"]},
@@ -237,8 +238,8 @@
     let currentPlayer = 1;
     let allPlayersResults = {};
     let sharedMap = null;
-    let globalWheelsTemplate = null;
 
+    // 當前執行中的輪盤控制變數
     let wheels = [];
     let currentWheelIndex = 0;
     let results = [];
@@ -259,26 +260,42 @@
         initPlayerStage();
     }
 
+    // 核心修正：每次生成輪盤序列時，都從最原始的乾淨資料深拷貝，絕對不殘留上一輪的 Push 狀態
     function initPlayerStage() {
-        // 每當換新玩家時，徹底將玩法標記與武器旗標清洗重設！
         skipGunWheel = false;
         doubleGuns = false;
         isSecondGun = false;
         currentWheelIndex = 0;
         results = [];
 
+        let tempBase = JSON.parse(JSON.stringify(baseWheelsData));
+
         if (currentPlayer === 1) {
-            wheels = JSON.parse(JSON.stringify(baseWheels));
-            const mapWheel = wheels.find(w => w.name === "地圖");
-            if (mapWheel) {
-                mapWheel.items = mapCategories[selectedMapCategory];
-            }
+            // 玩家 1 要抽地圖
+            wheels = tempBase;
+            // 根據選擇的地圖分類過濾地圖池
+            wheels[0].items = mapCategories[selectedMapCategory];
         } else {
-            // 從第二個玩家開始，直接複製初始乾淨的模版（剔除地圖）
-            wheels = JSON.parse(JSON.stringify(globalWheelsTemplate));
+            // 玩家 2 和 玩家 3 不要抽地圖，直接移除地圖這一輪
+            wheels = tempBase.filter(w => w.name !== "地圖");
         }
 
-        // 強制解除按鈕鎖定，重設回亮綠色狀態
+        // 根據已經抽出來的 sharedMap，修正所有人的裝備及槍枝池
+        if (sharedMap) {
+            wheels.forEach(w => {
+                if (["普壩", "長弓"].includes(sharedMap)) {
+                    if (w.name === "裝備") w.items = w.items.filter(i => i !== "5套");
+                    if (w.name === "槍") w.items = w.items.filter(g => !["M7", "AWM", "M82", "M250"].includes(g));
+                } else if (["絕航", "監獄"].includes(sharedMap)) {
+                    if (w.name === "裝備") {
+                        if (!w.items.includes("6套")) w.items.push("6套");
+                        w.items = w.items.filter(a => !["0套", "1套", "2套", "3套"].includes(a));
+                    }
+                }
+            });
+        }
+
+        // 強制重置按鈕外觀，回到最安全的綠色
         const spinButton = document.getElementById('spinButton');
         spinButton.disabled = false;
         spinButton.style.backgroundColor = "#4CAF50";
@@ -300,11 +317,8 @@
     }
 
     function updateProgressText() {
-        const totalGoal = wheels.length ? wheels.length : 5;
-        let prefix = "進度: ";
-        if (playerCount > 1 && wheels.length > 0) {
-            prefix = `玩家 ${currentPlayer} 進度: `;
-        }
+        const totalGoal = wheels.length;
+        let prefix = playerCount > 1 ? `玩家 ${currentPlayer} 進度: ` : "進度: ";
         document.getElementById('progressLabel').innerText = `${prefix}${Math.min(currentWheelIndex, totalGoal)} / ${totalGoal}`;
     }
 
@@ -325,7 +339,7 @@
         let currentWheel = wheels[currentWheelIndex];
         let items = currentWheel.items;
 
-        // 滾動跳字效果
+        // 滾動效果
         const totalSteps = 20;
         for (let i = 0; i < totalSteps; i++) {
             let tempChoice = items[Math.floor(Math.random() * items.length)];
@@ -333,7 +347,7 @@
             await sleep(50 + (i * 15));
         }
 
-        // 最終隨機結果
+        // 產出結果
         let finalChoice = items[Math.floor(Math.random() * items.length)];
 
         if (currentWheel.name === "槍") {
@@ -345,31 +359,12 @@
             results.push([currentWheel.name, finalChoice]);
         }
 
-        // 地圖池與裝備機率連動
+        // 記錄共用地圖
         if (currentWheel.name === "地圖") {
             sharedMap = finalChoice;
-            globalWheelsTemplate = wheels.filter(w => w.name !== "地圖");
-
-            if (["普壩", "長弓"].includes(finalChoice)) {
-                [wheels, globalWheelsTemplate].forEach(wg => {
-                    wg.forEach(w => {
-                        if (w.name === "裝備") w.items = w.items.filter(i => i !== "5套");
-                        if (w.name === "槍") w.items = w.items.filter(g => !["M7", "AWM", "M82", "M250"].includes(g));
-                    });
-                });
-            } else if (["絕航", "監獄"].includes(finalChoice)) {
-                [wheels, globalWheelsTemplate].forEach(wg => {
-                    wg.forEach(w => {
-                        if (w.name === "裝備") {
-                            if (!w.items.includes("6套")) w.items.push("6套");
-                            w.items = w.items.filter(a => !["0套", "1套", "2套", "3套"].includes(a));
-                        }
-                    });
-                });
-            }
         }
 
-        // 核心修正：只有在當前玩家的玩法輪到時，才去改動當前玩家的輪盤序列
+        // 玩法規則影響當前的陣列
         if (currentWheel.name === "玩法") {
             if (finalChoice === "跑刀") {
                 skipGunWheel = true;
@@ -380,8 +375,12 @@
                 }
             } else if (finalChoice === "雙槍") {
                 doubleGuns = true;
-                let gunWheel = wheels.find(w => w.name === "槍");
-                wheels.push({name: "槍", items: gunWheel.items}); // 只塞給目前玩家的序列
+                // 直接抓取乾淨的槍枝資料複製品塞到當前轉盤的最後，不污染全域
+                let pureGunItems = JSON.parse(JSON.stringify(baseWheelsData.find(w => w.name === "槍").items));
+                if (["普壩", "長弓"].includes(sharedMap)) {
+                    pureGunItems = pureGunItems.filter(g => !["M7", "AWM", "M82", "M250"].includes(g));
+                }
+                wheels.push({name: "槍", items: pureGunItems});
             }
         }
 
@@ -391,7 +390,7 @@
     }
 
     function nextStage() {
-        // 如果是跑刀玩法，自動跳過槍枝輪次
+        // 如果是跑刀玩法，自動跳過剩餘的槍枝抽籤
         if (skipGunWheel && currentWheelIndex < wheels.length && wheels[currentWheelIndex].name === "槍") {
             currentWheelIndex++;
             updateProgressText();
@@ -406,7 +405,7 @@
             spinButton.disabled = false;
             
             let nextWheel = wheels[currentWheelIndex];
-            // 判定是否為最後一輪的副武器
+            // 判斷是否為雙槍的最後一把副武器
             if (nextWheel.name === "槍" && doubleGuns && currentWheelIndex === wheels.length - 1) {
                 isSecondGun = true;
                 spinButton.innerText = "🎲 轉取副武器";
@@ -417,13 +416,13 @@
             }
             updateTitleAndPrompt();
         } else {
-            // 儲存當前玩家結果
+            // 存儲當前玩家結果
             allPlayersResults[currentPlayer] = {results: results, skipGun: skipGunWheel};
 
             if (currentPlayer < playerCount) {
                 currentPlayer++;
                 isSpinning = false;
-                initPlayerStage(); // 觸發完美重置
+                initPlayerStage(); // 完美初始化下一位玩家
             } else {
                 showFinalResults();
             }
@@ -454,25 +453,4 @@
 
             pData.results.forEach(res => {
                 if (!["玩法", "地圖"].includes(res[0])) {
-                    html += `• ${res[0]} ➔ ${res[1]}\n`;
-                }
-            });
-
-            if (pData.skipGun) html += `• 槍 ➔ 🚫 跑刀模式\n`;
-
-            html += `   </div>
-                </div>
-            `;
-        }
-
-        html += `</div><button class="reset-button" onclick="resetGame()">🔄 重新生成配置</button>`;
-        app.innerHTML = html;
-    }
-
-    function resetGame() {
-        location.reload(); 
-    }
-</script>
-
-</body>
-</html>
+                    html += `• ${res[0]} ➔ ${res
