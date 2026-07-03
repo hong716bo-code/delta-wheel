@@ -67,7 +67,7 @@
             font-size: 15px;
             font-weight: bold;
             cursor: pointer;
-            display: none; /* 預設隱藏，選全部隨機才顯示 */
+            display: none;
             align-items: center;
             gap: 6px;
             background: #ffebee;
@@ -81,7 +81,7 @@
             background: #ffcdd2;
         }
         
-        #map_zone, #weapon_zone, #ammo_zone, #wheel_zone, #results_zone {
+        #step_player, #map_zone, #weapon_zone, #ammo_zone, #wheel_zone, #results_zone {
             display: none;
         }
         
@@ -237,30 +237,37 @@
             border-radius: 4px;
             cursor: pointer;
         }
+        .confirm-btn {
+            padding: 6px 20px; 
+            font-weight: bold; 
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
 <div id="app" class="container">
     <div id="control_zone">
-        <fieldset class="player-frame" id="step_player">
+        <fieldset class="player-frame" id="step_player" style="display: block;">
             <legend>👥 第一步：選擇隊伍人數</legend>
             <div class="radio-group">
-                <label><input type="radio" name="p_count" value="1" onchange="selectPlayerCount(1)"> 1 人</label>
-                <label><input type="radio" name="p_count" value="2" onchange="selectPlayerCount(2)"> 2 人</label>
-                <label><input type="radio" name="p_count" value="3" onchange="selectPlayerCount(3)"> 3 人</label>
+                <label><input type="radio" name="p_count" value="1"> 1 人</label>
+                <label><input type="radio" name="p_count" value="2"> 2 人</label>
+                <label><input type="radio" name="p_count" value="3"> 3 人</label>
             </div>
+            <div style="margin-top:12px;"><button type="button" class="confirm-btn" onclick="confirmPlayerCount()">確認隊伍人數</button></div>
         </fieldset>
         
         <div id="map_zone">
             <fieldset class="player-frame" id="step_map">
                 <legend>🗺️ 第二步：選擇地圖種類</legend>
                 <div class="radio-group">
-                    <label><input type="radio" name="map_cat" value="機密" onchange="selectMapCategory('機密')"> 機密</label>
-                    <label><input type="radio" name="map_cat" value="常規" onchange="selectMapCategory('常規')"> 常規</label>
-                    <label><input type="radio" name="map_cat" value="絕密" onchange="selectMapCategory('絕密')"> 絕密</label>
-                    <label><input type="radio" name="map_cat" value="全圖" onchange="selectMapCategory('全圖')"> 全圖</label>
+                    <label><input type="radio" name="map_cat" value="機密"> 機密</label>
+                    <label><input type="radio" name="map_cat" value="常規"> 常規</label>
+                    <label><input type="radio" name="map_cat" value="絕密"> 絕密</label>
+                    <label><input type="radio" name="map_cat" value="全圖"> 全圖</label>
                 </div>
+                <div style="margin-top:12px;"><button type="button" class="confirm-btn" onclick="confirmMapCategory()">確認地圖種類</button></div>
             </fieldset>
         </div>
 
@@ -277,7 +284,7 @@
                     <label><input type="checkbox" name="weapon_cat" value="手槍"> 手槍</label>
                     <label><input type="checkbox" name="weapon_cat" value="特殊武器"> 特殊武器</label>
                 </div>
-                <div style="margin-top:12px;"><button type="button" onclick="confirmWeaponSetting()" style="padding: 6px 20px; font-weight:bold; cursor:pointer;">確認武器範圍</button></div>
+                <div style="margin-top:12px;"><button type="button" class="confirm-btn" onclick="confirmWeaponSetting()">確認武器範圍</button></div>
             </fieldset>
         </div>
 
@@ -291,7 +298,7 @@
                 <label id="lbl_red_cb" class="checkbox-label">
                     <input type="checkbox" id="include_red" value="紅彈"> 額外加入紅彈武器池
                 </label>
-                <div style="margin-top:10px;"><button type="button" onclick="confirmAmmoSetting()" style="padding: 6px 20px; font-weight:bold; cursor:pointer;">確認子彈設定</button></div>
+                <div style="margin-top:10px;"><button type="button" class="confirm-btn" onclick="confirmAmmoSetting()">確認子彈設定</button></div>
             </fieldset>
         </div>
 
@@ -335,7 +342,7 @@
         {name: "角色", items: ["紅狼", "威龍", "無名", "張姐", "蠱", "蝶", "蜂醫", "老黑", "烏魯魯", "深藍", "比特", "露娜", "曉雯", "銀翼", "回響", "液氮"]},
         {name: "玩法", items: ["雙槍", "一把", "跑刀"]},
         {name: "裝備", items: ["0套", "1套", "2套", "3套", "4套", "5套"]},
-        {name: "子彈", items: []}, // 由原本的全隊共用改入個人轉盤
+        {name: "子彈", items: []},
         {name: "槍", items: []}
     ];
 
@@ -348,7 +355,7 @@
 
     let playerCount = null;
     let selectedMapCategory = null;
-    let selectedWeaponCategories = []; // 改為陣列儲存複選
+    let selectedWeaponCategories = [];
     let selectedAmmoCategory = null;
     let includeRedGuns = false;
 
@@ -362,10 +369,10 @@
     let results = [];
     let isSpinning = false;
 
-    let skipGunAndAmmoWheel = false; // 跑刀時連子彈都不用抽
+    let skipGunAndAmmoWheel = false;
     let doubleGuns = false;
     let isSecondGun = false;
-    let pRolledAmmo = "不限制"; // 暫存目前玩家抽出的子彈顏色
+    let pRolledAmmo = "不限制";
 
     function getWeaponType(gunName) {
         for (const [type, guns] of Object.entries(weaponCategories)) {
@@ -376,21 +383,27 @@
         return "未知種類";
     }
 
-    function selectPlayerCount(val) {
-        playerCount = val;
-        document.querySelectorAll('input[name="p_count"]').forEach(i => {
-            if(!i.checked) i.parentElement.style.opacity = "0.5";
-            i.disabled = true;
-        });
+    function confirmPlayerCount() {
+        const checkedRadio = document.querySelector('input[name="p_count"]:checked');
+        if (!checkedRadio) {
+            alert("請先選擇人數！");
+            return;
+        }
+        playerCount = parseInt(checkedRadio.value);
+        // 隱藏第一步，展開第二步
+        document.getElementById('step_player').style.display = "none";
         document.getElementById('map_zone').style.display = "block";
     }
 
-    function selectMapCategory(val) {
-        selectedMapCategory = val;
-        document.querySelectorAll('input[name="map_cat"]').forEach(i => {
-            if(!i.checked) i.parentElement.style.opacity = "0.5";
-            i.disabled = true;
-        });
+    function confirmMapCategory() {
+        const checkedRadio = document.querySelector('input[name="map_cat"]:checked');
+        if (!checkedRadio) {
+            alert("請先選擇地圖種類！");
+            return;
+        }
+        selectedMapCategory = checkedRadio.value;
+        // 隱藏第二步，展開第三步
+        document.getElementById('map_zone').style.display = "none";
         document.getElementById('weapon_zone').style.display = "block";
     }
 
@@ -401,11 +414,8 @@
             return;
         }
         selectedWeaponCategories = Array.from(checkedBoxes).map(cb => cb.value);
-
-        document.querySelectorAll('input[name="weapon_cat"]').forEach(cb => {
-            if(!cb.checked) cb.parentElement.style.opacity = "0.5";
-            cb.disabled = true;
-        });
+        // 隱藏第三步，展開第四步
+        document.getElementById('weapon_zone').style.display = "none";
         document.getElementById('ammo_zone').style.display = "block";
     }
 
@@ -422,33 +432,24 @@
 
     function confirmAmmoSetting() {
         if (!selectedAmmoCategory) {
-            alert("請選擇一種子彈限制設定！");
+            alert("請先選擇一種子彈限制設定！");
             return;
         }
         includeRedGuns = document.getElementById('include_red').checked;
-
-        document.querySelectorAll('input[name="ammo_cat"]').forEach(i => {
-            if(!i.checked) i.parentElement.style.opacity = "0.5";
-            i.disabled = true;
-        });
-        document.getElementById('include_red').disabled = true;
-        document.getElementById('lbl_red_cb').style.opacity = "0.5";
-
+        // 隱藏第四步，展開第五步
+        document.getElementById('ammo_zone').style.display = "none";
         document.getElementById('wheel_zone').style.display = "block";
     }
 
     function initPlayerStage() {
         if (currentPlayer === 1) {
             wheels = JSON.parse(JSON.stringify(baseWheels));
-            
-            // 填入共用地圖
             const mapWheel = wheels.find(w => w.name === "地圖");
             if (mapWheel) mapWheel.items = mapCategories[selectedMapCategory];
         } else {
             wheels = JSON.parse(JSON.stringify(globalWheelsTemplate));
         }
 
-        // 初始化每個玩家的子彈輪內容項目
         const ammoWheel = wheels.find(w => w.name === "子彈");
         if (ammoWheel) {
             if (selectedAmmoCategory === "不限制") {
@@ -502,7 +503,6 @@
         let currentWheel = wheels[currentWheelIndex];
         let items = currentWheel.items;
 
-        // 當需要抽「槍」時，動態根據剛剛該玩家抽到的子彈來進行武器庫過濾
         if (currentWheel.name === "槍") {
             let baseWeaponPool = [];
             selectedWeaponCategories.forEach(cat => {
@@ -527,7 +527,6 @@
                 });
             }
 
-            // AWM M82 限制強制移除
             if (!includeRedGuns) {
                 finalGunPool = finalGunPool.filter(gun => !["AWM", "M82"].includes(gun));
             }
@@ -564,7 +563,6 @@
 
         let finalChoice = items[Math.floor(Math.random() * items.length)];
 
-        // 處理不同格子的結果
         if (currentWheel.name === "子彈") {
             pRolledAmmo = finalChoice;
             displayLabel.innerText = `✨ 子彈：${finalChoice} ✨`;
@@ -588,7 +586,6 @@
             results.push([currentWheel.name, finalChoice]);
         }
 
-        // 當抽中共同地圖後的動態規則修正
         if (currentWheel.name === "地圖") {
             sharedMap = finalChoice;
             globalWheelsTemplate = wheels.filter(w => w.name !== "地圖");
@@ -643,7 +640,6 @@
     }
 
     function nextStage() {
-        // 如果是跑刀，自動跳過「子彈」輪與「槍」輪
         if (skipGunAndAmmoWheel && currentWheelIndex < wheels.length) {
             if (wheels[currentWheelIndex].name === "子彈" || wheels[currentWheelIndex].name === "槍") {
                 currentWheelIndex++;
@@ -775,15 +771,11 @@
         
         const app = document.getElementById('app');
         app.classList.add("results-mode");
-        
-        let catsText = selectedWeaponCategories.join('、');
-        let modeText = selectedAmmoCategory === "全部隨機" ? "全部隨機抽" : "不限制";
 
         let html = `
             <div class="result-title">🎉 本局隊伍出裝配置 🎉</div>
             <div class="map-title">
-                🗺️ 出戰地圖 [${selectedMapCategory}] ➔ ${sharedMap}<br>
-                🔋 武器池限制: [${catsText}] ➔ 子彈規則: [${modeText}]
+                🗺️ 出戰地圖 [${selectedMapCategory}] ➔ ${sharedMap}
             </div>
             
             <div class="main-result-frame">
@@ -864,7 +856,6 @@
         spinButton.innerText = "🎲 開始隨機出裝";
         document.getElementById('progressLabel').innerText = "等待開始...";
 
-        // 重置所有輸入控制項
         document.querySelectorAll('input[type="radio"]').forEach(i => {
             i.checked = false;
             i.disabled = false;
@@ -876,15 +867,21 @@
             i.parentElement.style.opacity = "1";
         });
 
-        document.getElementById('lbl_red_cb').style.display = "none"; // 初始隱藏
+        document.getElementById('lbl_red_cb').style.display = "none";
 
         const resultsZone = document.getElementById('results_zone');
         resultsZone.innerHTML = "";
         resultsZone.style.display = "none";
         
+        // 重置時重新將第一步展示，其餘收起來
+        document.getElementById('step_player').style.display = "block";
         document.getElementById('map_zone').style.display = "none";
+        document.getElementById('step_map').style.display = "block";
         document.getElementById('weapon_zone').style.display = "none";
+        document.getElementById('step_weapon').style.display = "block";
         document.getElementById('ammo_zone').style.display = "none";
+        document.getElementById('step_ammo').style.display = "block";
+        
         document.getElementById('wheel_zone').style.display = "none";
         document.getElementById('control_zone').style.display = "block";
         
