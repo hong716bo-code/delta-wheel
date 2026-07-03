@@ -67,7 +67,7 @@
             font-size: 15px;
             font-weight: bold;
             cursor: pointer;
-            display: inline-flex;
+            display: none; /* 預設隱藏，只有選全部隨機才顯示 */
             align-items: center;
             gap: 6px;
             background: #ffebee;
@@ -186,7 +186,6 @@
             white-space: pre-line;
         }
         
-        /* 挑戰任務專用樣式 */
         .challenge-box {
             background: #fff8e1;
             border: 2px dashed #ffb300;
@@ -284,13 +283,10 @@
 
         <div id="ammo_zone">
             <fieldset class="player-frame" id="step_ammo">
-                <legend>🔴 第四步：選擇子彈顏色限制</legend>
+                <legend>🔴 第四步：選擇子彈種類限制</legend>
                 <div class="radio-group">
-                    <label id="lbl_white"><input type="radio" name="ammo_cat" value="白彈" onchange="selectAmmoCategory('白彈')"> 白彈</label>
-                    <label id="lbl_green"><input type="radio" name="ammo_cat" value="綠彈" onchange="selectAmmoCategory('綠彈')"> 綠彈</label>
-                    <label id="lbl_blue"><input type="radio" name="ammo_cat" value="藍彈" onchange="selectAmmoCategory('藍彈')"> 藍彈</label>
-                    <label id="lbl_purple"><input type="radio" name="ammo_cat" value="紫彈" onchange="selectAmmoCategory('紫彈')"> 紫彈</label>
-                    <label id="lbl_yellow"><input type="radio" name="ammo_cat" value="金彈" onchange="selectAmmoCategory('金彈')"> 金彈</label>
+                    <label><input type="radio" name="ammo_cat" value="全部隨機" onchange="selectAmmoCategory('全部隨機')"> 全部隨機</label>
+                    <label><input type="radio" name="ammo_cat" value="不限制" onchange="selectAmmoCategory('不限制')"> 不限制</label>
                 </div>
                 <label id="lbl_red_cb" class="checkbox-label">
                     <input type="checkbox" id="include_red" value="紅彈"> 額外加入紅彈武器池
@@ -356,6 +352,7 @@
     let selectedWeaponCategory = null;
     let selectedAmmoCategory = null;
     let includeRedGuns = false;
+    let rolledAmmoColor = "不限制"; // 當局實際抽出來的子彈顏色
 
     let currentPlayer = 1;
     let allPlayersResults = {};
@@ -395,20 +392,6 @@
             if(!i.checked) i.parentElement.style.opacity = "0.5";
             i.disabled = true;
         });
-
-        if (val === "常規") {
-            document.getElementById('lbl_purple').style.display = "none";
-            document.getElementById('lbl_yellow').style.display = "none";
-            document.getElementById('lbl_red_cb').style.display = "none";
-            document.getElementById('include_red').checked = false;
-            document.getElementById('include_red').disabled = true;
-        } else {
-            document.getElementById('lbl_purple').style.display = "flex";
-            document.getElementById('lbl_yellow').style.display = "flex";
-            document.getElementById('lbl_red_cb').style.display = "inline-flex";
-            document.getElementById('include_red').disabled = false;
-        }
-
         document.getElementById('weapon_zone').style.display = "block";
     }
 
@@ -423,11 +406,18 @@
 
     function selectAmmoCategory(val) {
         selectedAmmoCategory = val;
+        const cbLabel = document.getElementById('lbl_red_cb');
+        if (val === "全部隨機") {
+            cbLabel.style.display = "inline-flex";
+        } else {
+            cbLabel.style.display = "none";
+            document.getElementById('include_red').checked = false;
+        }
     }
 
     function confirmAmmoSetting() {
         if (!selectedAmmoCategory) {
-            alert("請選擇一種子彈顏色！");
+            alert("請選擇一種子彈限制設定！");
             return;
         }
         includeRedGuns = document.getElementById('include_red').checked;
@@ -438,6 +428,20 @@
         });
         document.getElementById('include_red').disabled = true;
         document.getElementById('lbl_red_cb').style.opacity = "0.5";
+
+        // 決定當局實際的子彈範圍
+        if (selectedAmmoCategory === "全部隨機") {
+            let availableColors = ["白彈", "綠彈", "藍彈", "紫彈", "金彈"];
+            if (selectedMapCategory === "常規") {
+                // 常規圖強制移除 紫、金、紅
+                availableColors = ["白彈", "綠彈", "藍彈"];
+            } else if (includeRedGuns) {
+                availableColors.push("紅彈");
+            }
+            rolledAmmoColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+        } else {
+            rolledAmmoColor = "不限制";
+        }
 
         document.getElementById('wheel_zone').style.display = "block";
     }
@@ -460,13 +464,18 @@
                     baseWeaponPool = [...weaponCategories[selectedWeaponCategory]];
                 }
 
-                let allowedAmmos = [...ammoPools[selectedAmmoCategory]];
-                if (includeRedGuns && selectedMapCategory !== "常規") {
-                    allowedAmmos = [...new Set([...allowedAmmos, ...ammoPools["紅彈"]])];
+                // 子彈過濾邏輯
+                let finalGunPool = baseWeaponPool;
+                if (rolledAmmoColor !== "不限制") {
+                    let allowedAmmos = [...ammoPools[rolledAmmoColor]];
+                    // 如果勾了紅彈，取聯集 (常規圖防呆，常規圖時includeRedGuns必定為false)
+                    if (includeRedGuns) {
+                        allowedAmmos = [...new Set([...allowedAmmos, ...ammoPools["紅彈"]])];
+                    }
+                    finalGunPool = baseWeaponPool.filter(gun => allowedAmmos.includes(gun));
                 }
 
-                let finalGunPool = baseWeaponPool.filter(gun => allowedAmmos.includes(gun));
-
+                // 常規地圖排除紫、金、紅純高階彈武器
                 if (selectedMapCategory === "常規") {
                     finalGunPool = finalGunPool.filter(gun => {
                         const inPurple = ammoPools["紫彈"].includes(gun);
@@ -474,6 +483,11 @@
                         const inRed = ammoPools["紅彈"].includes(gun);
                         return !((inPurple || inGold || inRed) && !ammoPools["白彈"].includes(gun) && !ammoPools["綠彈"].includes(gun));
                     });
+                }
+
+                // 核心追加條件：若「未勾選紅彈」，武器庫強制移出 AWM、M82
+                if (!includeRedGuns) {
+                    finalGunPool = finalGunPool.filter(gun => !["AWM", "M82"].includes(gun));
                 }
 
                 gunWheel.items = finalGunPool;
@@ -587,305 +601,4 @@
                             if (!w.items.includes("6套")) {
                                 w.items.push("6套");
                             }
-                            const removeArmorList = ["0套", "1套", "2套", "3套"];
-                            w.items = w.items.filter(armor => !removeArmorList.includes(armor));
-                        }
-                    });
-                });
-            }
-        }
-
-        if (currentWheel.name === "玩法") {
-            if (finalChoice === "跑刀") {
-                skipGunWheel = true;
-                if (["絕航", "監獄"].includes(sharedMap)) {
-                    wheels.forEach(w => { if(w.name === "裝備") w.items = ["5套", "6套"]; });
-                    globalWheelsTemplate.forEach(w => { if(w.name === "裝備") w.items = ["5套", "6套"]; });
-                } 
-                else if (["機航", "機壩", "巴克什"].includes(sharedMap)) {
-                    const removeKnifeArmor = ["0套", "1套", "2套"];
-                    [wheels, globalWheelsTemplate].forEach(wheelGroup => {
-                        wheelGroup.forEach(w => {
-                            if (w.name === "裝備") {
-                                w.items = w.items.filter(armor => !removeKnifeArmor.includes(armor));
-                            }
-                        });
-                    });
-                }
-            } else if (finalChoice === "雙槍") {
-                doubleGuns = true;
-                let gunWheel = wheels.find(w => w.name === "槍");
-                wheels.push({name: "槍", items: gunWheel.items});
-            }
-        }
-
-        currentWheelIndex++;
-        updateProgressText();
-        setTimeout(nextStage, 1500);
-    }
-
-    function nextStage() {
-        if (skipGunWheel && currentWheelIndex < wheels.length) {
-            if (wheels[currentWheelIndex].name === "槍") {
-                currentWheelIndex++;
-                updateProgressText();
-                nextStage();
-                return;
-            }
-        }
-
-        const titleLabel = document.getElementById('titleLabel');
-        const displayLabel = document.getElementById('displayLabel');
-        const spinButton = document.getElementById('spinButton');
-
-        if (currentWheelIndex < wheels.length) {
-            let nextWheel = wheels[currentWheelIndex];
-            let titlePrefix = playerCount > 1 ? `【玩家 ${currentPlayer}】` : "";
-
-            if (nextWheel.name === "槍" && doubleGuns && currentWheelIndex === wheels.length - 1) {
-                isSecondGun = true;
-                titleLabel.innerText = `${titlePrefix}槍 (第二把副武器)`;
-                displayLabel.innerText = "請點擊轉取第二把槍！";
-                displayLabel.style.color = "#666666";
-                spinButton.disabled = false;
-                spinButton.style.backgroundColor = "#FF5722";
-                spinButton.innerText = "🎲 轉取副武器";
-            } else {
-                titleLabel.innerText = `${titlePrefix}${nextWheel.name}`;
-                displayLabel.innerText = "準備好轉下一個了嗎？";
-                displayLabel.style.color = "#666666";
-                spinButton.disabled = false;
-                spinButton.style.backgroundColor = "#4CAF50";
-                spinButton.innerText = "🎲 開始旋轉";
-            }
-            isSpinning = false;
-        } else {
-            allPlayersResults[currentPlayer] = {results: results, skipGun: skipGunWheel};
-
-            if (currentPlayer < playerCount) {
-                currentPlayer++;
-                isSpinning = false;
-                initPlayerStage();
-
-                titleLabel.innerText = `輪到 玩家 ${currentPlayer}`;
-                titleLabel.style.color = "#009688";
-                displayLabel.innerText = `請玩家 ${currentPlayer} 準備好後點擊按鈕`;
-                displayLabel.style.color = "#666666";
-                spinButton.disabled = false;
-                spinButton.style.backgroundColor = "#009688";
-                spinButton.innerText = `🎲 開始抽玩家 ${currentPlayer}`;
-            } else {
-                showFinalResults();
-            }
-        }
-    }
-
-    // 隨機抽取共享挑戰任務的邏輯
-    function rollChallengeTasks() {
-        // 1. 決定任務數量 (1個或2個，概率各50%)
-        const taskCount = Math.random() < 0.5 ? 1 : 2;
-        
-        // 7個大任務的池子
-        const taskPool = [1, 2, 3, 4, 5, 6, 7];
-        // 隨機打亂取出指定數量的任務
-        const selectedTasks = [];
-        while(selectedTasks.length < taskCount) {
-            const randIdx = Math.floor(Math.random() * taskPool.length);
-            selectedTasks.push(taskPool.splice(randIdx, 1)[0]);
-        }
-        
-        // 用機率抽子項目的輔助函式 (傳入 項目陣列 與 對應機率陣列)
-        function getWeightedItem(items, weights) {
-            const totalWeight = weights.reduce((a, b) => a + b, 0);
-            let rand = Math.random() * totalWeight;
-            for (let i = 0; i < items.length; i++) {
-                if (rand < weights[i]) return items[i];
-                rand -= weights[i];
-            }
-            return items[items.length - 1];
-        }
-
-        let taskOutputs = [];
-
-        selectedTasks.forEach(taskNum => {
-            if (taskNum === 1) {
-                // 1. 摸房卡
-                const res = getWeightedItem(["藍卡", "紫卡", "金卡", "紅卡"], [5, 20, 35, 40]);
-                taskOutputs.push(`🃏 房卡任務：全隊需要摸出一張【${res}】或以上品質的房卡`);
-            } 
-            else if (taskNum === 2) {
-                // 2. 全隊擊殺數
-                // 10, 11, 12各佔10%，其餘0-9均分剩下的70% (每人7%)
-                let kills = 0;
-                const randKills = Math.random() * 100;
-                if (randKills < 10) kills = 10;
-                else if (randKills < 20) kills = 11;
-                else if (randKills < 30) kills = 12;
-                else {
-                    kills = Math.floor(Math.random() * 10); // 0~9
-                }
-                taskOutputs.push(`⚔️ 擊殺任務：全隊本局累積擊殺總數需達到 【${kills} 殺】`);
-            }
-            else if (taskNum === 3) {
-                // 3. 摸大紅
-                const res = getWeightedItem(["12格大紅", "9格大紅", "6格紅", "任意紅"], [40, 30, 20, 10]);
-                taskOutputs.push(`💎 撤離任務：全隊本局需要成功帶出至少一個【${res}】`);
-            }
-            else if (taskNum === 4) {
-                // 4. 子彈攜帶量
-                const res = getWeightedItem(["100發", "150發", "180發", "240發"], [40, 30, 20, 10]);
-                taskOutputs.push(`🎒 後勤限制：子彈攜帶量上限調整為【每人共 ${res}】(其餘放倉庫)`);
-            }
-            else if (taskNum === 5) {
-                // 5. 藥品禁止攜帶
-                const res = getWeightedItem(["回血用藥品", "止痛類藥品", "手術包", "止血類藥品", "全部醫療物資"], [15, 20, 30, 20, 15]);
-                taskOutputs.push(`🚫 醫療限制：整局【禁止攜帶與使用：${res}】`);
-            }
-            else if (taskNum === 6) {
-                // 6. 頭甲修禁止攜帶
-                const res = getWeightedItem(["防彈衣修復包(甲修)", "頭盔修復包(頭修)", "全部頭盔與護甲修復包"], [50, 30, 20]);
-                taskOutputs.push(`🛠️ 維修限制：整局【禁止攜帶與使用：${res}】`);
-            }
-            else if (taskNum === 7) {
-                // 7. 針劑禁止攜帶
-                const needleItems = ["體能針", "M2負重針", "體能活化針", "戰鬥興奮劑", "紫聽針", "藍聽針", "M1負重針", "腎上腺素", "全部針劑/興奮劑"];
-                const needleWeights = [15, 15, 15, 20, 5, 5, 15, 3, 7];
-                const res = getWeightedItem(needleItems, needleWeights);
-                taskOutputs.push(`🧪 科技限制：整局【禁止攜帶與使用：${res}】`);
-            }
-        });
-
-        // 渲染到網頁畫面上
-        let html = `
-            <div class="challenge-title">⚠️ 全隊共享挑戰任務 (自選是否挑戰)</div>
-        `;
-        taskOutputs.forEach(t => {
-            html += `<div class="challenge-item">${t}</div>`;
-        });
-        
-        document.getElementById('challenge_display').innerHTML = html;
-    }
-
-    function showFinalResults() {
-        document.getElementById('control_zone').style.display = "none";
-        
-        const app = document.getElementById('app');
-        app.classList.add("results-mode");
-        
-        let redText = includeRedGuns ? "已加入" : "未加入";
-        if (selectedMapCategory === "常規") redText = "強制移除";
-
-        let html = `
-            <div class="result-title">🎉 本局隊伍出裝配置 🎉</div>
-            <div class="map-title">
-                🗺️ 出戰地圖 [${selectedMapCategory}] ➔ ${sharedMap}<br>
-                🔋 武器池限制: [${selectedWeaponCategory}] + [${selectedAmmoCategory}] (紅彈: ${redText})
-            </div>
-            
-            <div class="main-result-frame">
-        `;
-
-        for (let p_idx = 1; p_idx <= playerCount; p_idx++) {
-            let pData = allPlayersResults[p_idx];
-            html += `
-                <div class="p-frame">
-                    <div class="p-frame-title"> 玩家 ${p_idx} </div>
-                    <div class="p-text">`;
-            
-            if (playerCount === 1) {
-                html += `• 地圖 ➔ ${sharedMap}\n`;
-            }
-
-            pData.results.forEach(res => {
-                if (!["玩法", "地圖"].includes(res[0])) {
-                    html += `• ${res[0]} ➔ ${res[1]}\n`;
-                }
-            });
-
-            if (pData.skipGun) {
-                html += `• 槍 ➔ 🚫 跑刀模式\n`;
-            }
-
-            html += `   </div>
-                </div>
-            `;
-        }
-
-        html += `
-            </div>
-
-            <div class="challenge-box">
-                <div id="challenge_display" style="text-align: center;">
-                    <button class="btn-challenge" onclick="rollChallengeTasks()">🎲 抽取全隊共享挑戰任務</button>
-                    <div style="font-size:13px; color:#777;">(點擊將隨機刷新 1~2 個高難度限制任務)</div>
-                </div>
-            </div>
-
-            <button class="reset-button" onclick="resetGame()">🔄 重新生成配置</button>
-        `;
-
-        const resultsZone = document.getElementById('results_zone');
-        resultsZone.innerHTML = html;
-        resultsZone.style.display = "block";
-    }
-
-    function resetGame() {
-        playerCount = null;
-        selectedMapCategory = null;
-        selectedWeaponCategory = null;
-        selectedAmmoCategory = null;
-        includeRedGuns = false;
-
-        currentPlayer = 1;
-        allPlayersResults = {};
-        sharedMap = null;
-        globalWheelsTemplate = null;
-        wheels = [];
-        currentWheelIndex = 0;
-        results = [];
-        isSpinning = false;
-        skipGunWheel = false;
-        doubleGuns = false;
-        isSecondGun = false;
-
-        document.getElementById('titleLabel').innerText = "配置已就緒";
-        document.getElementById('titleLabel').style.color = "#333333";
-        document.getElementById('displayLabel').innerText = "點擊下方按鈕開始隨機";
-        document.getElementById('displayLabel').style.color = "#666666";
-        
-        const spinButton = document.getElementById('spinButton');
-        spinButton.disabled = false;
-        spinButton.style.backgroundColor = "#4CAF50";
-        spinButton.innerText = "🎲 開始隨機出裝";
-        document.getElementById('progressLabel').innerText = "等待開始...";
-
-        document.querySelectorAll('input[type="radio"]').forEach(i => {
-            i.checked = false;
-            i.disabled = false;
-            i.parentElement.style.opacity = "1";
-        });
-
-        document.getElementById('include_red').checked = false;
-        document.getElementById('include_red').disabled = false;
-        document.getElementById('lbl_red_cb').style.opacity = "1";
-        document.getElementById('lbl_red_cb').style.display = "inline-flex";
-        document.getElementById('lbl_purple').style.display = "flex";
-        document.getElementById('lbl_yellow').style.display = "flex";
-
-        const resultsZone = document.getElementById('results_zone');
-        resultsZone.innerHTML = "";
-        resultsZone.style.display = "none";
-        
-        document.getElementById('map_zone').style.display = "none";
-        document.getElementById('weapon_zone').style.display = "none";
-        document.getElementById('ammo_zone').style.display = "none";
-        document.getElementById('wheel_zone').style.display = "none";
-        document.getElementById('control_zone').style.display = "block";
-        
-        const app = document.getElementById('app');
-        app.classList.remove("results-mode");
-    }
-</script>
-
-</body>
-</html>
+                            const removeArmorList =
