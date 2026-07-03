@@ -380,7 +380,7 @@
                 return type;
             }
         }
-        return "未知種類";
+        return "武器";
     }
 
     function confirmPlayerCount() {
@@ -390,7 +390,6 @@
             return;
         }
         playerCount = parseInt(checkedRadio.value);
-        // 隱藏第一步，展開第二步
         document.getElementById('step_player').style.display = "none";
         document.getElementById('map_zone').style.display = "block";
     }
@@ -402,7 +401,6 @@
             return;
         }
         selectedMapCategory = checkedRadio.value;
-        // 隱藏第二步，展開第三步
         document.getElementById('map_zone').style.display = "none";
         document.getElementById('weapon_zone').style.display = "block";
     }
@@ -414,7 +412,6 @@
             return;
         }
         selectedWeaponCategories = Array.from(checkedBoxes).map(cb => cb.value);
-        // 隱藏第三步，展開第四步
         document.getElementById('weapon_zone').style.display = "none";
         document.getElementById('ammo_zone').style.display = "block";
     }
@@ -423,7 +420,13 @@
         selectedAmmoCategory = val;
         const cbLabel = document.getElementById('lbl_red_cb');
         if (val === "全部隨機") {
-            cbLabel.style.display = "inline-flex";
+            // 只有當不是「常規」地圖時才提供「紅彈」勾選框
+            if (selectedMapCategory !== "常規") {
+                cbLabel.style.display = "inline-flex";
+            } else {
+                cbLabel.style.display = "none";
+                document.getElementById('include_red').checked = false;
+            }
         } else {
             cbLabel.style.display = "none";
             document.getElementById('include_red').checked = false;
@@ -436,7 +439,6 @@
             return;
         }
         includeRedGuns = document.getElementById('include_red').checked;
-        // 隱藏第四步，展開第五步
         document.getElementById('ammo_zone').style.display = "none";
         document.getElementById('wheel_zone').style.display = "block";
     }
@@ -455,12 +457,33 @@
             if (selectedAmmoCategory === "不限制") {
                 ammoWheel.items = ["不限制"];
             } else {
-                let options = ["白彈", "綠彈", "藍彈"];
-                if (selectedMapCategory !== "常規") {
-                    options.push("紫彈", "金彈");
-                    if (includeRedGuns) options.push("紅彈");
+                let pool = [];
+                
+                // 【核心修改】依照指定的精確機率權重建立滾動池
+                if (selectedMapCategory === "常規") {
+                    // 常規地圖機率：白彈(35%) 綠彈(40%) 藍彈(25%)
+                    for(let i=0; i<35; i++) pool.push("白彈");
+                    for(let i=0; i<40; i++) pool.push("綠彈");
+                    for(let i=0; i<25; i++) pool.push("藍彈");
+                } else {
+                    if (includeRedGuns) {
+                        // 非常規有紅彈：白(15%) 綠(20%) 藍(25%) 紫(15%) 金(15%) 紅(10%)
+                        for(let i=0; i<15; i++) pool.push("白彈");
+                        for(let i=0; i<20; i++) pool.push("綠彈");
+                        for(let i=0; i<25; i++) pool.push("藍彈");
+                        for(let i=0; i<15; i++) pool.push("紫彈");
+                        for(let i=0; i<15; i++) pool.push("金彈");
+                        for(let i=0; i<10; i++) pool.push("紅彈");
+                    } else {
+                        // 非常規無紅彈：白(20%) 綠(25%) 藍(25%) 紫(15%) 金(15%)
+                        for(let i=0; i<20; i++) pool.push("白彈");
+                        for(let i=0; i<25; i++) pool.push("綠彈");
+                        for(let i=0; i<25; i++) pool.push("藍彈");
+                        for(let i=0; i<15; i++) pool.push("紫彈");
+                        for(let i=0; i<15; i++) pool.push("金彈");
+                    }
                 }
-                ammoWheel.items = options;
+                ammoWheel.items = pool;
             }
         }
 
@@ -510,20 +533,23 @@
             });
 
             let finalGunPool = baseWeaponPool;
+            
+            // 子彈限制過濾
             if (pRolledAmmo !== "不限制") {
                 let allowedAmmos = [...ammoPools[pRolledAmmo]];
+                // 如果非全隨機有帶紅彈，那麼紅彈池的槍也必須能備選
                 if (includeRedGuns && selectedMapCategory !== "常規") {
                     allowedAmmos = [...new Set([...allowedAmmos, ...ammoPools["紅彈"]])];
                 }
                 finalGunPool = baseWeaponPool.filter(gun => allowedAmmos.includes(gun));
             }
 
+            // 常規地圖過濾：只能出現具有白或綠彈屬性的武器
             if (selectedMapCategory === "常規") {
                 finalGunPool = finalGunPool.filter(gun => {
-                    const inPurple = ammoPools["紫彈"].includes(gun);
-                    const inGold = ammoPools["金彈"].includes(gun);
-                    const inRed = ammoPools["紅彈"].includes(gun);
-                    return !((inPurple || inGold || inRed) && !ammoPools["白彈"].includes(gun) && !ammoPools["綠彈"].includes(gun));
+                    const isWhite = ammoPools["白彈"].includes(gun);
+                    const isGreen = ammoPools["綠彈"].includes(gun);
+                    return isWhite || isGreen;
                 });
             }
 
@@ -571,6 +597,8 @@
         } 
         else if (currentWheel.name === "槍") {
             let wType = getWeaponType(finalChoice);
+            if (finalChoice === "無適用武器(被過濾)") wType = "過濾";
+            
             if (isSecondGun) {
                 displayLabel.innerText = `✨ 副武器：${finalChoice} ✨`;
                 displayLabel.style.color = "#FF5722";
@@ -873,7 +901,6 @@
         resultsZone.innerHTML = "";
         resultsZone.style.display = "none";
         
-        // 重置時重新將第一步展示，其餘收起來
         document.getElementById('step_player').style.display = "block";
         document.getElementById('map_zone').style.display = "none";
         document.getElementById('step_map').style.display = "block";
