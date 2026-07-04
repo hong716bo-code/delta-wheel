@@ -498,13 +498,11 @@
         // 🛠️ 護航模式特定邏輯處理
         if (gameMode === "護航專屬") {
             if (isBossTurn()) {
-                // 老闆只抽專屬角色
                 wheels = wheels.filter(w => w.name === "角色");
                 wheels.forEach(w => {
                     if (w.name === "角色") w.items = ["蝶", "蠱", "蜂醫"];
                 });
             } else {
-                // 隊員部分：注入子彈池，並將玩法中的「跑刀」移除
                 const ammoWheel = wheels.find(w => w.name === "子彈");
                 if (ammoWheel) ammoWheel.items = generateAmmoPool();
 
@@ -514,7 +512,6 @@
                 }
             }
         } else {
-            // 普通模式：正常注入子彈池即可
             const ammoWheel = wheels.find(w => w.name === "子彈");
             if (ammoWheel) ammoWheel.items = generateAmmoPool();
         }
@@ -570,14 +567,15 @@
 
         const titleLabel = document.getElementById('titleLabel');
         const displayLabel = document.getElementById('displayLabel');
-        // 🛠️ 強制修正：確保護航模式下的隊員絕對不會抽到跑刀
-    if (gameMode === "護航專屬" && !isBossTurn()) {
-        const playWheel = wheels.find(w => w.name === "玩法");
-        if (playWheel) {
-            playWheel.items = playWheel.items.filter(i => i !== "跑刀");
+
+        // 🛠️ 護航強制過濾：確保護航模式下的隊員絕對不會抽到跑刀
+        if (gameMode === "護航專屬" && !isBossTurn()) {
+            const playWheel = wheels.find(w => w.name === "玩法");
+            if (playWheel) {
+                playWheel.items = playWheel.items.filter(i => i !== "跑刀");
+            }
         }
-    }
-        
+
         let currentWheel = wheels[currentWheelIndex];
         let items = currentWheel.items;
         
@@ -733,11 +731,13 @@
             }
         }
 
-        if (currentWheel.name === "子彈 (主武器)" && currentWheelIndex + 1 < wheels.length) {
-            if (wheels[currentWheelIndex+1].name === "槍 (主武器)") wheels[currentWheelIndex+1].bindAmmo = currentTurnAmmoQualities["主武器"];
-        }
-        if (currentWheel.name === "子彈 (副武器)" && currentWheelIndex + 1 < wheels.length) {
-            if (wheels[currentWheelIndex+1].name === "槍 (副武器)") wheels[currentWheelIndex+1].bindAmmo = currentTurnAmmoQualities["副武器"];
+        if (currentWheelIndex + 1 < wheels.length) {
+            if (currentWheel.name === "子彈 (主武器)" && wheels[currentWheelIndex+1].name === "槍 (主武器)") {
+                wheels[currentWheelIndex+1].bindAmmo = currentTurnAmmoQualities["主武器"];
+            }
+            if (currentWheel.name === "子彈 (副武器)" && wheels[currentWheelIndex+1].name === "槍 (副武器)") {
+                wheels[currentWheelIndex+1].bindAmmo = currentTurnAmmoQualities["副武器"];
+            }
         }
 
         currentWheelIndex++;
@@ -746,9 +746,25 @@
     }
 
     function nextStage() {
+        // 🛠️ 核心修改：如果是跑刀模式，跳過所有子彈與槍轉盤
         if (skipGunAndAmmoWheel && currentWheelIndex < wheels.length) {
             if (wheels[currentWheelIndex].name.startsWith("子彈") || wheels[currentWheelIndex].name.startsWith("槍")) {
                 currentWheelIndex++;
+                updateProgressText();
+                nextStage();
+                return;
+            }
+        }
+
+        // 🛠️ 核心修改：如果子彈設定選擇「不限制」，當前轉盤若是子彈轉盤，直接自動跳過並填入「不限制」結果
+        if (selectedAmmoCategory === "不限制" && currentWheelIndex < wheels.length) {
+            let nextWheelName = wheels[currentWheelIndex].name;
+            if (nextWheelName === "子彈" || nextWheelName === "子彈 (主武器)" || nextWheelName === "子彈 (副武器)") {
+                let weaponSlot = nextWheelName.includes("副武器") ? "副武器" : "主武器";
+                currentTurnAmmoQualities[weaponSlot] = "不限制";
+                results.push([nextWheelName, "不限制"]); // 記錄結果
+                
+                currentWheelIndex++; // 直接前進到下一個 (槍轉盤)
                 updateProgressText();
                 nextStage();
                 return;
