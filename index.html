@@ -248,7 +248,6 @@
 
 <div id="app" class="container">
     <div id="control_zone">
-        <!-- 第 0 步：選擇遊玩模式 -->
         <fieldset class="player-frame" id="step_mode" style="display: block;">
             <legend>⭐ 選擇出裝房型</legend>
             <div class="radio-group">
@@ -258,7 +257,6 @@
             <div style="margin-top:12px;"><button type="button" class="confirm-btn" onclick="confirmGameMode()">確認房型模式</button></div>
         </fieldset>
 
-        <!-- 第一步：選擇人數 -->
         <fieldset class="player-frame" id="step_player">
             <legend>👥 第一步：選擇隊伍人數</legend>
             <div class="radio-group">
@@ -269,7 +267,6 @@
             <div style="margin-top:12px;"><button type="button" class="confirm-btn" onclick="confirmPlayerCount()">確認隊伍人數</button></div>
         </fieldset>
         
-        <!-- 第二步：地圖種類 -->
         <div id="map_zone">
             <fieldset class="player-frame" id="step_map">
                 <legend>🗺️ 第二步：選擇地圖種類</legend>
@@ -283,7 +280,6 @@
             </fieldset>
         </div>
 
-        <!-- 第三步：選擇武器種類 -->
         <div id="weapon_zone">
             <fieldset class="player-frame" id="step_weapon">
                 <legend>🔫 第三步：選擇武器種類範圍 (可複選)</legend>
@@ -301,7 +297,6 @@
             </fieldset>
         </div>
 
-        <!-- 第四步：選擇子彈限制 -->
         <div id="ammo_zone">
             <fieldset class="player-frame" id="step_ammo">
                 <legend>🔴 第四步：選擇子彈限制規則</legend>
@@ -316,7 +311,6 @@
             </fieldset>
         </div>
 
-        <!-- 第五步：轉盤主介面 -->
         <div id="wheel_zone">
             <hr style="border: 1px dashed #ccc; margin: 20px 0;">
             <h2 id="titleLabel">配置已就緒</h2>
@@ -328,7 +322,6 @@
         </div>
     </div>
 
-    <!-- 結果區塊 -->
     <div id="results_zone"></div>
 </div>
 
@@ -388,7 +381,7 @@
 
     let skipGunAndAmmoWheel = false;
     let currentTurnAmmoQualities = { "主武器": "不限制", "副武器": "不限制" };
-    let ammoRollCounts = { "主武器": "副武器" };
+    let ammoRollCounts = { "主武器": 0, "副武器": 0 };
 
     function getWeaponType(gunName) {
         let cleanName = gunName.replace(/^\[.*?\]\s*/, "");
@@ -495,7 +488,7 @@
             wheels = JSON.parse(JSON.stringify(globalWheelsTemplate));
         }
 
-        // 🛠️ 護航模式特定邏輯處理
+        // 護航模式特定邏輯處理
         if (gameMode === "護航專屬") {
             if (isBossTurn()) {
                 wheels = wheels.filter(w => w.name === "角色");
@@ -746,28 +739,28 @@
     }
 
     function nextStage() {
-        // 🛠️ 核心修改：如果是跑刀模式，跳過所有子彈與槍轉盤
+        // 🛠️ 核心修改1：如果是跑刀模式，跳過所有子彈與槍轉盤
         if (skipGunAndAmmoWheel && currentWheelIndex < wheels.length) {
             if (wheels[currentWheelIndex].name.startsWith("子彈") || wheels[currentWheelIndex].name.startsWith("槍")) {
                 currentWheelIndex++;
                 updateProgressText();
                 nextStage();
-                return;
+                return; // 🛑 阻斷，避免執行後面的面板覆蓋
             }
         }
 
-        // 🛠️ 核心修改：如果子彈設定選擇「不限制」，當前轉盤若是子彈轉盤，直接自動跳過並填入「不限制」結果
+        // 🛠️ 核心修改2：如果子彈設定選擇「不限制」，當前轉盤若是子彈轉盤，直接自動跳過並填入「不限制」結果
         if (selectedAmmoCategory === "不限制" && currentWheelIndex < wheels.length) {
             let nextWheelName = wheels[currentWheelIndex].name;
             if (nextWheelName === "子彈" || nextWheelName === "子彈 (主武器)" || nextWheelName === "子彈 (副武器)") {
                 let weaponSlot = nextWheelName.includes("副武器") ? "副武器" : "主武器";
                 currentTurnAmmoQualities[weaponSlot] = "不限制";
-                results.push([nextWheelName, "不限制"]); // 記錄結果
+                results.push([nextWheelName, "不限制"]); // 自動記錄子彈結果
                 
                 currentWheelIndex++; // 直接前進到下一個 (槍轉盤)
                 updateProgressText();
-                nextStage();
-                return;
+                nextStage(); // 遞迴進入下一階段
+                return; // 🛑 關鍵阻斷：防止底下更新介面的程式碼誤將按鈕及標題改成子彈狀態
             }
         }
 
