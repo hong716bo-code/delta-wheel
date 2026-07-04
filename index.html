@@ -334,7 +334,7 @@
         "藍彈": ["ASh-12", "RM277", "AR57", "MCX LT", "MK47", "KC17", "K437", "騰龍", "AS Val", "CAR-15", "PTR-32", "G3", "SCAR-H", "AK-12", "SG552", "M7", "AUG", "M16A4", "K416", "AKS-74U", "AKM", "M4A1", "MK4", "QCQ171", "MP7", "勇士", "SR-3M", "SMG-45", "野牛", "UZI", "Vector", "P90", "MP5", "FS-12", "725雙管", "S12K", "M1014", "QJB-201", "M250", "M249", "PKM", "槓桿", "PGS-1", "SR9", "SR-25", "SKS", "M14", "SVD", "VSS", "Mini-14", "SVCH", "M700", "R93", "SV-98", "M1911", "G17", "93R", "G18", "沙漠之鷹", ".357左輪", "QSZ92G", "複合弓"],
         "紫彈": ["ASh-12", "RM277", "AR57", "MCX LT", "MK47", "KC17", "K437", "騰龍", "AS Val", "CAR-15", "PTR-32", "G3", "SCAR-H", "AK-12", "SG552", "M7", "AUG", "M16A4", "K416", "AKS-74U", "AKM", "M4A1", "MK4", "QCQ171", "MP7", "勇士", "SR-3M", "SMG-45", "野牛", "UZI", "Vector", "P90", "MP5", "FS-12", "725雙管", "S12K", "M1014", "QJB-201", "M250", "M249", "PKM", "槓桿", "PGS-1", "SR9", "SR-25", "SKS", "M14", "SVD", "VSS", "Mini-14", "SVCH", "M700", "R93", "SV-98", "M1911", "G17", "93R", "G18", "沙漠之鷹", ".357左輪", "QSZ92G", "複合弓"],
         "金彈": ["ASh-12", "RM277", "AR57", "MCX LT", "MK47", "KC17", "K437", "騰龍", "AS Val", "CAR-15", "PTR-32", "G3", "SCAR-H", "AK-12", "SG552", "M7", "AUG", "M16A4", "K416", "AKS-74U", "AKM", "M4A1", "MK4", "MP7", "SR-3M", "SMG-45", "Vector", "P90", "QJB-201", "M250", "M249", "PKM", "槓桿", "PGS-1", "SR9", "SR-25", "SKS", "M14", "SVD", "VSS", "Mini-14", "SVCH", "M700", "R93", "SV-98", "M1911", "沙漠之鷹", "複合弓"],
-        "紅彈": ["RM277", "KC17", "K437", "CAR-15", "PTR-32", "G3", "SCAR-H", "M7", "AKM", "M4A1", "M250", "PKM", "PGS-1", "SR9", "SR-25", "M14", "SVD", "SVCH", "M82", "AWM", "M700", "R93", "SV-98"]
+        "紅彈": ["RM277", "G3", "SCAR-H", "M7", "M250", "PKM", "PGS-1", "SR9", "SR-25", "M14", "SVD", "SVCH", "M82", "AWM", "M700", "R93", "SV-98"]
     };
 
     const baseWheels = [
@@ -500,23 +500,24 @@
 
             let finalGunPool = [];
 
+            // 常規地圖過濾高階武器
             if (selectedMapCategory === "常規" || ["普壩", "長弓", "AZ3"].includes(sharedMap)) {
                 baseWeaponPool = baseWeaponPool.filter(gun => {
                     return ammoPools["白彈"].includes(gun) || ammoPools["綠彈"].includes(gun) || ammoPools["藍彈"].includes(gun);
                 });
             }
 
+            // 【邏輯修正修正】根據抽到的子彈品質決定出裝池
             if (lastRolledAmmoQuality === "不限制") {
+                // 不限制時：過濾掉 AWM 和 M82（因為這兩把是紅彈限定）
                 finalGunPool = baseWeaponPool.filter(gun => !["AWM", "M82"].includes(gun));
             } 
             else if (lastRolledAmmoQuality === "紅彈") {
-                if (selectedWeaponCategories.includes("狙擊步槍")) {
-                    finalGunPool = ["AWM", "M82"];
-                } else {
-                    finalGunPool = baseWeaponPool.filter(gun => ammoPools["紅彈"].includes(gun));
-                }
+                // 紅彈時：直接撈出所有支援紅彈，且包含在玩家自選武器範圍內的槍（AWM、M82 與大家同等機率平分）
+                finalGunPool = baseWeaponPool.filter(gun => ammoPools["紅彈"].includes(gun));
             } 
             else {
+                // 白、綠、藍、紫、金彈時：符合該品質，且「絕對不能」包含紅彈限定槍 AWM 與 M82
                 finalGunPool = baseWeaponPool.filter(gun => {
                     const canUseAmmo = ammoPools[lastRolledAmmoQuality].includes(gun);
                     const isGodGun = ["AWM", "M82"].includes(gun);
@@ -699,7 +700,6 @@
 
     function rollChallengeTasks() {
         const taskCount = Math.random() < 0.5 ? 1 : 2;
-        // 將隨機池擴展至 1 ~ 8，加入最新的武器改裝限制
         const taskPool = [1, 2, 3, 4, 5, 6, 7, 8];
         const selectedTasks = [];
         while(selectedTasks.length < taskCount) {
@@ -751,7 +751,6 @@
         document.getElementById('challenge_display').innerHTML = html;
     }
 
-    // 後續函式保持不變...
     function showFinalResults() {
         document.getElementById('control_zone').style.display = "none";
         const app = document.getElementById('app');
