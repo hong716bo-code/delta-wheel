@@ -328,6 +328,7 @@
         "特殊武器": ["複合弓"]
     };
 
+    // 依據您提供的最新對應表完全同步
     const ammoPools = {
         "白彈": ["AR57", "MK47", "KC17", "CAR-15", "PTR-32", "AK-12", "SG552", "AUG", "M16A4", "K416", "AKS-74U", "AKM", "M4A1", "QCQ171", "勇士", "SMG-45", "野牛", "UZI", "Vector", "P90", "MP5", "FS-12", "725雙管", "S12K", "M1014", "SKS", "Mini-14", "M1911", "G17", "93R", "G18", "QSZ92G"],
         "綠彈": ["AR57", "MK47", "KC17", "騰龍", "CAR-15", "PTR-32", "G3", "SCAR-H", "AK-12", "SG552", "AUG", "M16A4", "K416", "AKS-74U", "AKM", "M4A1", "QCQ171", "勇士", "SMG-45", "野牛", "UZI", "Vector", "P90", "MP5", "FS-12", "725雙管", "S12K", "M1014", "QJB-201", "M249", "PKM", "PGS-1", "SR9", "SR-25", "SKS", "M14", "Mini-14", "M700", "R93", "M1911", "G17", "93R", "G18", "沙漠之鷹", ".357左輪", "QSZ92G"],
@@ -337,7 +338,6 @@
         "紅彈": ["RM277", "KC17", "K437", "CAR-15", "PTR-32", "G3", "SCAR-H", "M7", "AKM", "M4A1", "M250", "PKM", "PGS-1", "SR9", "SR-25", "M14", "SVD", "SVCH", "M82", "AWM", "M700", "R93", "SV-98"]
     };
 
-    // 【核心重構】基礎順序更變：先抽「子彈」再抽「槍」
     const baseWheels = [
         {name: "地圖", items: ["機航", "絕航", "機壩", "普壩", "監獄", "巴克什", "長弓", "AZ3", "機核"]},
         {name: "角色", items: ["紅狼", "威龍", "無名", "張姐", "蠱", "蝶", "蜂醫", "老黑", "烏魯魯", "深藍", "比特", "露娜", "曉雯", "銀翼", "回響", "液氮"]},
@@ -371,8 +371,6 @@
     let isSpinning = false;
 
     let skipGunAndAmmoWheel = false;
-    
-    // 用於記錄當前環節抽中的最新子彈品質
     let lastRolledAmmoQuality = "不限制";
 
     function getWeaponType(gunName) {
@@ -495,7 +493,7 @@
         let currentWheel = wheels[currentWheelIndex];
         let items = currentWheel.items;
 
-        // 【精確控制】輪到抽槍時，根據「剛剛熱騰騰抽出的子彈品質」來精準過濾武器池
+        // 【過濾系統】隨機抽取槍枝環節
         if (currentWheel.name.startsWith("槍")) {
             let baseWeaponPool = [];
             selectedWeaponCategories.forEach(cat => {
@@ -504,11 +502,18 @@
 
             let finalGunPool = [];
 
+            // 如果目前抽到的是常規地圖，強制過濾並移除只能打金、紫、紅彈的武器
+            if (selectedMapCategory === "常規" || ["普壩", "長弓", "AZ3"].includes(sharedMap)) {
+                baseWeaponPool = baseWeaponPool.filter(gun => {
+                    return ammoPools["白彈"].includes(gun) || ammoPools["綠彈"].includes(gun) || ammoPools["藍彈"].includes(gun);
+                });
+            }
+
+            // 依據抽出的子彈品質，進行更精確的交叉篩選
             if (lastRolledAmmoQuality === "不限制") {
                 finalGunPool = baseWeaponPool.filter(gun => !["AWM", "M82"].includes(gun));
             } 
             else if (lastRolledAmmoQuality === "紅彈") {
-                // 如果是天選紅彈，則只留紅彈專屬的 AWM 和 M82（若玩家沒選狙擊步槍，則抓紅彈武器池交集）
                 if (selectedWeaponCategories.includes("狙擊步槍")) {
                     finalGunPool = ["AWM", "M82"];
                 } else {
@@ -516,7 +521,6 @@
                 }
             } 
             else {
-                // 常規子彈品質（白/綠/藍/紫/金），過濾出能打該子彈的槍，並徹底封鎖 AWM/M82
                 finalGunPool = baseWeaponPool.filter(gun => {
                     const canUseAmmo = ammoPools[lastRolledAmmoQuality].includes(gun);
                     const isGodGun = ["AWM", "M82"].includes(gun);
@@ -525,7 +529,7 @@
             }
 
             if (finalGunPool.length === 0) {
-                finalGunPool = ["無適用武器(子彈級別不符)"];
+                finalGunPool = ["無適用武器(常規地圖已過濾高階武器)"];
             }
 
             items = finalGunPool;
@@ -537,7 +541,6 @@
             titleLabel.innerText = `【全隊共用】${currentWheel.name}`;
             titleLabel.style.color = "#FF9800";
         } else if (currentWheel.name.startsWith("槍") && currentWheel.bindAmmo) {
-            // 提示玩家這把槍是要配合剛剛抽到的什麼子彈
             titleLabel.innerText = `${titlePrefix}${currentWheel.name} (配合: ${currentWheel.bindAmmo})`;
             titleLabel.style.color = "#E91E63";
         } else {
@@ -557,14 +560,14 @@
         let finalChoice = items[Math.floor(Math.random() * items.length)];
 
         if (currentWheel.name.startsWith("子彈")) {
-            lastRolledAmmoQuality = finalChoice; // 存下子彈結果給下一步的槍用
+            lastRolledAmmoQuality = finalChoice; 
             displayLabel.innerText = `✨ 子彈品質：${finalChoice} ✨`;
             displayLabel.style.color = "#FF9800";
             results.push([currentWheel.name, finalChoice]);
         } 
         else if (currentWheel.name.startsWith("槍")) {
             let wType = getWeaponType(finalChoice);
-            if (finalChoice === "無適用武器(子彈級別不符)") wType = "限制";
+            if (finalChoice.startsWith("無適用武器")) wType = "限制";
             let formattedGun = `[${wType}] ${finalChoice}`;
 
             displayLabel.innerText = `✨ 獲得武器：${finalChoice} ✨`;
@@ -577,7 +580,6 @@
             results.push([currentWheel.name, finalChoice]);
         }
 
-        // 地圖對護甲的影響
         if (currentWheel.name === "地圖") {
             sharedMap = finalChoice;
             globalWheelsTemplate = wheels.filter(w => w.name !== "地圖");
@@ -598,7 +600,6 @@
             }
         }
 
-        // 玩法分支：雙槍模式插隊拆解 (子彈 -> 槍 -> 子彈 -> 槍)
         if (currentWheel.name === "玩法") {
             if (finalChoice === "跑刀") {
                 skipGunAndAmmoWheel = true;
@@ -642,7 +643,6 @@
             }
         }
 
-        // 動態把抽到的子彈名稱傳遞給下一個槍枝轉盤的標題做提示
         if (currentWheel.name === "子彈 (主武器)" && currentWheelIndex + 1 < wheels.length) {
             if (wheels[currentWheelIndex+1].name === "槍 (主武器)") wheels[currentWheelIndex+1].bindAmmo = lastRolledAmmoQuality;
         }
@@ -789,7 +789,6 @@
             if (pData.skipGun) {
                 html += `• 武器配置 ➔ 🚫 跑刀模式 (免抽槍彈)\n`;
             } else {
-                // 【結果呈現優化】完全符合： 槍枝名稱 (子彈品質) 的呈現格式
                 if (mainGun) {
                     html += `• 槍 (主武器) ➔ ${mainGun} <span style="color:#e65100;font-weight:bold;">(${mainAmmo})</span>\n`;
                 }
