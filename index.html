@@ -81,7 +81,7 @@
             background: #ffcdd2;
         }
         
-        #step_player, #map_zone, #weapon_zone, #ammo_zone, #wheel_zone, #results_zone {
+        #step_mode, #step_player, #map_zone, #weapon_zone, #ammo_zone, #wheel_zone, #results_zone {
             display: none;
         }
         
@@ -248,10 +248,19 @@
 
 <div id="app" class="container">
     <div id="control_zone">
-        <fieldset class="player-frame" id="step_player" style="display: block;">
+        <fieldset class="player-frame" id="step_mode" style="display: block;">
+            <legend>⭐ 選擇出裝房型</legend>
+            <div class="radio-group">
+                <label><input type="radio" name="game_mode" value="普通玩家"> 普通玩家模式</label>
+                <label><input type="radio" name="game_mode" value="護航專屬"> 👑 護航專屬模式</label>
+            </div>
+            <div style="margin-top:12px;"><button type="button" class="confirm-btn" onclick="confirmGameMode()">確認房型模式</button></div>
+        </fieldset>
+
+        <fieldset class="player-frame" id="step_player">
             <legend>👥 第一步：選擇隊伍人數</legend>
             <div class="radio-group">
-                <label><input type="radio" name="p_count" value="1"> 1 人</label>
+                <label id="lbl_p1"><input type="radio" name="p_count" value="1"> 1 人</label>
                 <label><input type="radio" name="p_count" value="2"> 2 人</label>
                 <label><input type="radio" name="p_count" value="3"> 3 人</label>
             </div>
@@ -353,6 +362,7 @@
         "全圖": ["機壩", "機航", "巴克什", "普壩", "長弓", "監獄", "絕航", "AZ3", "機核"]
     };
 
+    let gameMode = "普通玩家";
     let playerCount = null;
     let selectedMapCategory = null;
     let selectedWeaponCategories = [];
@@ -371,8 +381,6 @@
 
     let skipGunAndAmmoWheel = false;
     let currentTurnAmmoQualities = { "主武器": "不限制", "副武器": "不限制" };
-    
-    // 新增：用來紀錄目前子彈抽到第幾次
     let ammoRollCounts = { "主武器": 0, "副武器": 0 };
 
     function getWeaponType(gunName) {
@@ -381,6 +389,22 @@
             if (guns.includes(cleanName)) return type;
         }
         return "武器";
+    }
+
+    function confirmGameMode() {
+        const checkedRadio = document.querySelector('input[name="game_mode"]:checked');
+        if (!checkedRadio) { alert("請選擇房型模式！"); return; }
+        gameMode = checkedRadio.value;
+        
+        const lblP1 = document.getElementById('lbl_p1');
+        if (gameMode === "護航專屬") {
+            lblP1.style.display = "none";
+        } else {
+            lblP1.style.display = "inline-flex";
+        }
+
+        document.getElementById('step_mode').style.display = "none";
+        document.getElementById('step_player').style.display = "block";
     }
 
     function confirmPlayerCount() {
@@ -451,6 +475,10 @@
         return pool;
     }
 
+    function isBossTurn() {
+        return (gameMode === "護航專屬" && currentPlayer === playerCount);
+    }
+
     function initPlayerStage() {
         if (currentPlayer === 1) {
             wheels = JSON.parse(JSON.stringify(baseWheels));
@@ -460,8 +488,15 @@
             wheels = JSON.parse(JSON.stringify(globalWheelsTemplate));
         }
 
-        const ammoWheel = wheels.find(w => w.name === "子彈");
-        if (ammoWheel) ammoWheel.items = generateAmmoPool();
+        if (isBossTurn()) {
+            wheels = wheels.filter(w => w.name === "角色");
+            wheels.forEach(w => {
+                if (w.name === "角色") w.items = ["蝶", "蠱", "蜂醫"];
+            });
+        } else {
+            const ammoWheel = wheels.find(w => w.name === "子彈");
+            if (ammoWheel) ammoWheel.items = generateAmmoPool();
+        }
 
         currentWheelIndex = 0;
         results = [];
@@ -472,27 +507,25 @@
     }
 
     function updateProgressText() {
-        const totalGoal = wheels.length ? wheels.length : 6;
+        const totalGoal = wheels.length ? wheels.length : 1;
         let prefix = "進度: ";
+        let isBoss = isBossTurn();
+        let displayPlayerName = isBoss ? `玩家 ${currentPlayer} (👑 老闆)` : `玩家 ${currentPlayer}`;
+
         if (playerCount > 1 && wheels.length > 0 && wheels[Math.max(0, currentWheelIndex - 1)].name !== "地圖") {
-            prefix = `玩家 ${currentPlayer} 進度: `;
+            prefix = `${displayPlayerName} 進度: `;
         }
         document.getElementById('progressLabel').innerText = `${prefix}${Math.min(currentWheelIndex, totalGoal)} / ${totalGoal}`;
     }
 
     async function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-    // 【核心邏輯修正】檢查指定子彈品質在此次限制下是否有適用的合法槍枝
     function checkHasValidGuns(ammoQuality) {
         let baseWeaponPool = [];
-        selectedWeaponCategories.forEach(cat => {
-            baseWeaponPool = baseWeaponPool.concat(weaponCategories[cat]);
-        });
+        selectedWeaponCategories.forEach(cat => { baseWeaponPool = baseWeaponPool.concat(weaponCategories[cat]); });
 
         if (selectedMapCategory === "常規" || ["普壩", "長弓", "AZ3"].includes(sharedMap)) {
-            baseWeaponPool = baseWeaponPool.filter(gun => {
-                return ammoPools["白彈"].includes(gun) || ammoPools["綠彈"].includes(gun) || ammoPools["藍彈"].includes(gun);
-            });
+            baseWeaponPool = baseWeaponPool.filter(gun => ammoPools["白彈"].includes(gun) || ammoPools["綠彈"].includes(gun) || ammoPools["藍彈"].includes(gun));
         }
 
         let filtered = [];
@@ -501,9 +534,7 @@
         } else if (ammoQuality === "紅彈") {
             filtered = baseWeaponPool.filter(gun => ammoPools["紅彈"].includes(gun));
         } else {
-            filtered = baseWeaponPool.filter(gun => {
-                return ammoPools[ammoQuality].includes(gun) && !["AWM", "M82"].includes(gun);
-            });
+            filtered = baseWeaponPool.filter(gun => ammoPools[ammoQuality].includes(gun) && !["AWM", "M82"].includes(gun));
         }
         return filtered.length > 0;
     }
@@ -521,9 +552,11 @@
 
         let currentWheel = wheels[currentWheelIndex];
         let items = currentWheel.items;
-        let titlePrefix = playerCount > 1 ? `【玩家 ${currentPlayer}】` : "";
+        
+        let isBoss = isBossTurn();
+        let displayPlayerName = isBoss ? `玩家 ${currentPlayer} (👑 老闆)` : `玩家 ${currentPlayer}`;
+        let titlePrefix = playerCount > 1 ? `【${displayPlayerName}】` : "";
 
-        // ================== 處理槍枝生成 ==================
         if (currentWheel.name.startsWith("槍")) {
             let weaponSlot = currentWheel.name.includes("副武器") ? "副武器" : "主武器";
             let activeAmmoQuality = currentTurnAmmoQualities[weaponSlot];
@@ -537,11 +570,7 @@
             }
 
             let finalGunPool = [];
-            let isForceG17 = false;
-
-            // 檢查是否因為滿 3 次不符而強制轉成 G17
             if (rollCount >= 3 && !checkHasValidGuns(activeAmmoQuality)) {
-                isForceG17 = true;
                 finalGunPool = ["G17"];
             } else {
                 if (activeAmmoQuality === "不限制") {
@@ -557,7 +586,6 @@
             currentWheel.items = finalGunPool;
         }
 
-        // 修改標題文字顏色
         if (currentWheel.name === "地圖") {
             titleLabel.innerText = `【全隊共用】${currentWheel.name}`;
             titleLabel.style.color = "#FF9800";
@@ -569,7 +597,6 @@
             titleLabel.style.color = currentWheel.name.startsWith("子彈") ? "#FF9800" : "#009688";
         }
 
-        // 開始輪播動畫
         const totalSteps = 25;
         for (let i = 0; i < totalSteps; i++) {
             let tempChoice = items[Math.floor(Math.random() * items.length)];
@@ -581,31 +608,26 @@
 
         let finalChoice = items[Math.floor(Math.random() * items.length)];
 
-        // ================== 處理子彈結果 ==================
         if (currentWheel.name.startsWith("子彈")) {
             let weaponSlot = currentWheel.name.includes("副武器") ? "副武器" : "主武器";
-            ammoRollCounts[weaponSlot]++; // 紀錄該位置抽取次數加 1
+            ammoRollCounts[weaponSlot]++;
 
-            // 檢查該子彈是否能配對目前玩家指定的武器範圍
             let hasValidWeapon = checkHasValidGuns(finalChoice);
 
             if (!hasValidWeapon && ammoRollCounts[weaponSlot] < 3) {
-                // 如果不合，且還沒滿 3 次 ➔ 提示並直接自動幫玩家重新抽取！
                 displayLabel.innerText = `🔄 子彈[${finalChoice}]不支援所選武器，重抽中... (第 ${ammoRollCounts[weaponSlot]} 次)`;
                 displayLabel.style.color = "#d32f2f";
                 await sleep(1500);
                 isSpinning = false;
-                startSpin(); // 遞迴重抽
+                startSpin();
                 return;
             }
 
-            // 滿 3 次或找到合法搭配 ➔ 定案
             currentTurnAmmoQualities[weaponSlot] = finalChoice;
             displayLabel.innerText = `✨ 子彈品質：${finalChoice} ✨ ${ammoRollCounts[weaponSlot] >= 3 && !hasValidWeapon ? '(強制防呆啟用)' : ''}`;
             displayLabel.style.color = "#FF9800";
             results.push([currentWheel.name, finalChoice]);
         } 
-        // ================== 處理槍枝結果 ==================
         else if (currentWheel.name.startsWith("槍")) {
             let wType = getWeaponType(finalChoice);
             let formattedGun = `[${wType}] ${finalChoice}`;
@@ -620,7 +642,6 @@
             results.push([currentWheel.name, finalChoice]);
         }
 
-        // 後續常規與絕密地圖規則判斷
         if (currentWheel.name === "地圖") {
             sharedMap = finalChoice;
             globalWheelsTemplate = wheels.filter(w => w.name !== "地圖");
@@ -672,7 +693,7 @@
                 }
                 globalWheelsTemplate = updatedTemplate;
             }
-            else if (finalChoice === "一把槍") {
+            else if (finalChoice === "一把") {
                 wheels.forEach(w => {
                     if (w.name === "子彈") w.name = "子彈 (主武器)";
                     if (w.name === "槍") w.name = "槍 (主武器)";
@@ -712,7 +733,9 @@
 
         if (currentWheelIndex < wheels.length) {
             let nextWheel = wheels[currentWheelIndex];
-            let titlePrefix = playerCount > 1 ? `【玩家 ${currentPlayer}】` : "";
+            let isNextBoss = isBossTurn();
+            let displayPlayerName = isNextBoss ? `玩家 ${currentPlayer} (👑 老闆)` : `玩家 ${currentPlayer}`;
+            let titlePrefix = playerCount > 1 ? `【${displayPlayerName}】` : "";
 
             titleLabel.innerText = `${titlePrefix}${nextWheel.name}`;
             displayLabel.innerText = "準備好轉下一個了嗎？";
@@ -722,26 +745,30 @@
             spinButton.innerText = nextWheel.name.startsWith("子彈") ? "🎲 抽取子彈品質" : "🎲 開始旋轉";
             isSpinning = false;
         } else {
-            allPlayersResults[currentPlayer] = {results: results, skipGun: skipGunAndAmmoWheel};
+            allPlayersResults[currentPlayer] = {results: results, skipGun: skipGunAndAmmoWheel, isBoss: isBossTurn()};
 
             if (currentPlayer < playerCount) {
                 currentPlayer++;
                 isSpinning = false;
                 initPlayerStage();
 
-                titleLabel.innerText = `輪到 玩家 ${currentPlayer}`;
+                let isNextBoss = isBossTurn();
+                let displayPlayerName = isNextBoss ? `玩家 ${currentPlayer} (👑 老闆)` : `玩家 ${currentPlayer}`;
+
+                titleLabel.innerText = `輪到 ${displayPlayerName}`;
                 titleLabel.style.color = "#009688";
-                displayLabel.innerText = `請 玩家 ${currentPlayer} 點擊按鈕開始`;
+                displayLabel.innerText = `請點擊按鈕開始抽取`;
                 displayLabel.style.color = "#666666";
                 spinButton.disabled = false;
                 spinButton.style.backgroundColor = "#009688";
-                spinButton.innerText = `🎲 開始抽玩家 ${currentPlayer}`;
+                spinButton.innerText = `🎲 開始抽 ${displayPlayerName}`;
             } else {
                 showFinalResults();
             }
         }
     }
 
+    // 🛠️ 替換後的自訂任務代碼區塊
     function rollChallengeTasks() {
         const taskCount = Math.random() < 0.5 ? 1 : 2;
         const taskPool = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -782,7 +809,8 @@
                 const res = getWeightedItem(["防彈衣修復包", "頭盔修復包", "全部頭盔與護甲修復包"], [50, 30, 20]);
                 taskOutputs.push(`🛠️ 奪舍敵方頭甲：整局【禁止攜帶與使用：${res}】`);
             } else if (taskNum === 7) {
-                const res = getWeightedItem(["體能針", "M2負重針", "戰鬥興奮劑", "腎上腺素", "紫聽針", "藍聽針", "M1負重針", "體能活化針"], [20, 15, 20, 5, 10, 5, 20]);
+                // 安全修正：傳入8個項目，必須有8個權重數值 (20+15+20+5+10+5+15+10 = 100)
+                const res = getWeightedItem(["體能針", "M2負重針", "戰鬥興奮劑", "腎上腺素", "紫聽針", "藍聽針", "M1負重針", "體能活化針"], [20, 15, 20, 5, 10, 5, 15, 10]);
                 taskOutputs.push(`🧪激發玩家潛能 不依靠針劑：整局【禁止攜帶與使用：${res}】`);
             } else if (taskNum === 8) {
                 const res = getWeightedItem(["禁止改槍", "禁止裝瞄具", "只能最多裝5個藍色配件", "只能最多裝5個綠色配件", "只能最多裝4個紫色配件"], [30, 10, 20, 20, 20]);
@@ -800,44 +828,54 @@
         const app = document.getElementById('app');
         app.classList.add("results-mode");
 
+        let modeTag = gameMode === "護航專屬" ? `<span style="color:#e91e63;">[👑 護航防客制]</span>` : `[普通模式]`;
         let html = `
             <div class="result-title">🎉 本局隊伍出裝配置 🎉</div>
-            <div class="map-title">🗺️ 出戰地圖 [${selectedMapCategory}] ➔ ${sharedMap}</div>
+            <div class="map-title">🗺️ 出戰地圖 ${modeTag} ➔ ${sharedMap}</div>
             <div class="main-result-frame">
         `;
 
         for (let p_idx = 1; p_idx <= playerCount; p_idx++) {
             let pData = allPlayersResults[p_idx];
+            let isPBoss = pData.isBoss;
+            let displayTitle = isPBoss ? `👑 玩家 ${p_idx} (老闆)` : `玩家 ${p_idx}`;
+            
             html += `
-                <div class="p-frame">
-                    <div class="p-frame-title"> 玩家 ${p_idx} </div>
+                <div class="p-frame" style="${isPBoss ? 'border: 2px solid #ff9800; background:#fffde7;' : ''}">
+                    <div class="p-frame-title" style="${isPBoss ? 'color:#e65100;' : ''}"> ${displayTitle} </div>
                     <div class="p-text">`;
             
             if (playerCount === 1) html += `• 地圖 ➔ ${sharedMap}\n`;
 
-            let mainGun = "", mainAmmo = "", subGun = "", subAmmo = "";
-            let generalTexts = "";
-
-            pData.results.forEach(res => {
-                if (res[0] === "槍 (主武器)") mainGun = res[1];
-                else if (res[0] === "子彈 (主武器)") mainAmmo = res[1];
-                else if (res[0] === "槍 (副武器)") subGun = res[1];
-                else if (res[0] === "子彈 (副武器)") subAmmo = res[1];
-                else if (!["地圖"].includes(res[0])) {
-                    generalTexts += `• ${res[0]} ➔ ${res[1]}\n`;
-                }
-            });
-
-            html += generalTexts;
-
-            if (pData.skipGun) {
-                html += `• 武器配置 ➔ 🚫 跑刀模式 \n`;
+            if (isPBoss) {
+                let bossChar = "未抽中";
+                pData.results.forEach(res => { if(res[0] === "角色") bossChar = res[1]; });
+                html += `<span style="font-size:16px; font-weight:bold; color:#e65100;">• 角色 ➔ ${bossChar}</span>\n`;
             } else {
-                if (mainGun) {
-                    html += `• 槍 (主武器) ➔ ${mainGun} <span style="color:#e65100;font-weight:bold;">(${mainAmmo})</span>\n`;
-                }
-                if (subGun) {
-                    html += `• 槍 (副武器) ➔ ${subGun} <span style="color:#e65100;font-weight:bold;">(${subAmmo})</span>\n`;
+                let mainGun = "", mainAmmo = "", subGun = "", subAmmo = "";
+                let generalTexts = "";
+
+                pData.results.forEach(res => {
+                    if (res[0] === "槍 (主武器)") mainGun = res[1];
+                    else if (res[0] === "子彈 (主武器)") mainAmmo = res[1];
+                    else if (res[0] === "槍 (副武器)") subGun = res[1];
+                    else if (res[0] === "子彈 (副武器)") subAmmo = res[1];
+                    else if (!["地圖"].includes(res[0])) {
+                        generalTexts += `• ${res[0]} ➔ ${res[1]}\n`;
+                    }
+                });
+
+                html += generalTexts;
+
+                if (pData.skipGun) {
+                    html += `• 武器配置 ➔ 🚫 跑刀模式 (免抽槍彈)\n`;
+                } else {
+                    if (mainGun) {
+                        html += `• 槍 (主武器) ➔ ${mainGun} <span style="color:#e65100;font-weight:bold;">(${mainAmmo})</span>\n`;
+                    }
+                    if (subGun) {
+                        html += `• 槍 (副武器) ➔ ${subGun} <span style="color:#e65100;font-weight:bold;">(${subAmmo})</span>\n`;
+                    }
                 }
             }
 
@@ -885,7 +923,8 @@
         const resultsZone = document.getElementById('results_zone');
         resultsZone.innerHTML = ""; resultsZone.style.display = "none";
         
-        document.getElementById('step_player').style.display = "block";
+        document.getElementById('step_mode').style.display = "block";
+        document.getElementById('step_player').style.display = "none";
         document.getElementById('map_zone').style.display = "none";
         document.getElementById('step_map').style.display = "block";
         document.getElementById('weapon_zone').style.display = "none";
