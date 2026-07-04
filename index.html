@@ -370,11 +370,15 @@
     let isSpinning = false;
 
     let skipGunAndAmmoWheel = false;
-    let lastRolledAmmoQuality = "不限制";
+    
+    // 用物件來獨立紀錄主/副武器所抽到的子彈品質
+    let currentTurnAmmoQualities = { "主武器": "不限制", "副武器": "不限制" };
 
     function getWeaponType(gunName) {
+        // 防止傳入帶有中括號格式的資料
+        let cleanName = gunName.replace(/^\[.*?\]\s*/, "");
         for (const [type, guns] of Object.entries(weaponCategories)) {
-            if (guns.includes(gunName)) return type;
+            if (guns.includes(cleanName)) return type;
         }
         return "武器";
     }
@@ -462,7 +466,7 @@
         currentWheelIndex = 0;
         results = [];
         skipGunAndAmmoWheel = false;
-        lastRolledAmmoQuality = "不限制";
+        currentTurnAmmoQualities = { "主武器": "不限制", "副武器": "不限制" };
         updateProgressText();
     }
 
@@ -493,6 +497,10 @@
         let items = currentWheel.items;
 
         if (currentWheel.name.startsWith("槍")) {
+            // 判斷當前是處理主武器還是副武器
+            let weaponSlot = currentWheel.name.includes("副武器") ? "副武器" : "主武器";
+            let activeAmmoQuality = currentTurnAmmoQualities[weaponSlot];
+
             let baseWeaponPool = [];
             selectedWeaponCategories.forEach(cat => {
                 baseWeaponPool = baseWeaponPool.concat(weaponCategories[cat]);
@@ -500,33 +508,45 @@
 
             let finalGunPool = [];
 
-            // 常規地圖過濾高階武器
+            // 1. 常規地圖或指定常規圖：強制過濾掉不支援白綠藍的槍枝
             if (selectedMapCategory === "常規" || ["普壩", "長弓", "AZ3"].includes(sharedMap)) {
                 baseWeaponPool = baseWeaponPool.filter(gun => {
                     return ammoPools["白彈"].includes(gun) || ammoPools["綠彈"].includes(gun) || ammoPools["藍彈"].includes(gun);
                 });
             }
 
-            // 【邏輯修正修正】根據抽到的子彈品質決定出裝池
-            if (lastRolledAmmoQuality === "不限制") {
-                // 不限制時：過濾掉 AWM 和 M82（因為這兩把是紅彈限定）
+            // 2. 根據目前對應的子彈檔次篩選
+            if (activeAmmoQuality === "不限制") {
+                // 不限制：絕對不可出現紅彈限定槍 AWM / M82
                 finalGunPool = baseWeaponPool.filter(gun => !["AWM", "M82"].includes(gun));
             } 
-            else if (lastRolledAmmoQuality === "紅彈") {
-                // 紅彈時：直接撈出所有支援紅彈，且包含在玩家自選武器範圍內的槍（AWM、M82 與大家同等機率平分）
+            else if (activeAmmoQuality === "紅彈") {
+                // 紅彈：直接匹配紅彈池（此時 AWM 和 M82 若符合武器類別就會在池中，與大家同機率）
                 finalGunPool = baseWeaponPool.filter(gun => ammoPools["紅彈"].includes(gun));
             } 
             else {
-                // 白、綠、藍、紫、金彈時：符合該品質，且「絕對不能」包含紅彈限定槍 AWM 與 M82
+                // 白、綠、藍、紫、金彈：匹配對應子彈池，且【絕對排除】AWM 與 M82
                 finalGunPool = baseWeaponPool.filter(gun => {
-                    const canUseAmmo = ammoPools[lastRolledAmmoQuality].includes(gun);
+                    const canUseAmmo = ammoPools[activeAmmoQuality].includes(gun);
                     const isGodGun = ["AWM", "M82"].includes(gun);
                     return canUseAmmo && !isGodGun;
                 });
             }
 
+            // 3. 防呆安全機制：如果篩完是空的（例如常規圖限制配上不支援的組合）
             if (finalGunPool.length === 0) {
-                finalGunPool = ["無適用武器(常規地圖已過濾高階武器)"];
+                // 擴大包容性：從自選類別中，盲抓一個符合目前子彈的非神槍
+                let backupPool = [];
+                selectedWeaponCategories.forEach(cat => { backupPool = backupPool.concat(weaponCategories[cat]); });
+                if (activeAmmoQuality !== "不限制" && activeAmmoQuality !== "紅彈") {
+                    finalGunPool = backupPool.filter(gun => ammoPools[activeAmmoQuality].includes(gun) && !["AWM", "M82"].includes(gun));
+                } else {
+                    finalGunPool = backupPool.filter(gun => !["AWM", "M82"].includes(gun));
+                }
+            }
+
+            if (finalGunPool.length === 0) {
+                finalGunPool = ["M4A1"]; // 極端防呆底線
             }
 
             items = finalGunPool;
@@ -557,14 +577,15 @@
         let finalChoice = items[Math.floor(Math.random() * items.length)];
 
         if (currentWheel.name.startsWith("子彈")) {
-            lastRolledAmmoQuality = finalChoice; 
+            let weaponSlot = currentWheel.name.includes("副武器") ? "副武器" : "主武器";
+            currentTurnAmmoQualities[weaponSlot] = finalChoice; // 儲存至對應欄位
+
             displayLabel.innerText = `✨ 子彈品質：${finalChoice} ✨`;
             displayLabel.style.color = "#FF9800";
             results.push([currentWheel.name, finalChoice]);
         } 
         else if (currentWheel.name.startsWith("槍")) {
             let wType = getWeaponType(finalChoice);
-            if (finalChoice.startsWith("無適用武器")) wType = "限制";
             let formattedGun = `[${wType}] ${finalChoice}`;
 
             displayLabel.innerText = `✨ 獲得武器：${finalChoice} ✨`;
@@ -641,10 +662,10 @@
         }
 
         if (currentWheel.name === "子彈 (主武器)" && currentWheelIndex + 1 < wheels.length) {
-            if (wheels[currentWheelIndex+1].name === "槍 (主武器)") wheels[currentWheelIndex+1].bindAmmo = lastRolledAmmoQuality;
+            if (wheels[currentWheelIndex+1].name === "槍 (主武器)") wheels[currentWheelIndex+1].bindAmmo = currentTurnAmmoQualities["主武器"];
         }
         if (currentWheel.name === "子彈 (副武器)" && currentWheelIndex + 1 < wheels.length) {
-            if (wheels[currentWheelIndex+1].name === "槍 (副武器)") wheels[currentWheelIndex+1].bindAmmo = lastRolledAmmoQuality;
+            if (wheels[currentWheelIndex+1].name === "槍 (副武器)") wheels[currentWheelIndex+1].bindAmmo = currentTurnAmmoQualities["副武器"];
         }
 
         currentWheelIndex++;
@@ -822,7 +843,7 @@
         playerCount = null; selectedMapCategory = null; selectedWeaponCategories = []; selectedAmmoCategory = null; includeRedGuns = false;
         currentPlayer = 1; allPlayersResults = {}; sharedMap = null; globalWheelsTemplate = null;
         wheels = []; currentWheelIndex = 0; results = []; isSpinning = false; skipGunAndAmmoWheel = false;
-        lastRolledAmmoQuality = "不限制";
+        currentTurnAmmoQualities = { "主武器": "不限制", "副武器": "不限制" };
 
         document.getElementById('titleLabel').innerText = "配置已就緒";
         document.getElementById('titleLabel').style.color = "#333333";
