@@ -672,7 +672,7 @@
                 }
                 globalWheelsTemplate = updatedTemplate;
             }
-            else if (finalChoice === "一把") {
+            else if (finalChoice === "一把槍") {
                 wheels.forEach(w => {
                     if (w.name === "子彈") w.name = "子彈 (主武器)";
                     if (w.name === "槍") w.name = "槍 (主武器)";
@@ -764,33 +764,33 @@
         let taskOutputs = [];
         selectedTasks.forEach(taskNum => {
             if (taskNum === 1) {
-                const res = getWeightedItem(["藍卡", "紫卡", "金卡", "紅卡"], [5, 20, 35, 40]);
-                taskOutputs.push(`🃏 房卡任務：全隊需要摸出一張【${res}】或以上品質的房卡`);
+                const res = getWeightedItem(["藍色", "紫色", "金色", "紅色"], [5, 20, 35, 40]);
+                taskOutputs.push(`🃏 房卡大盜：全隊需要摸出一張【${res}】品質的房卡`);
             } else if (taskNum === 2) {
                 let kills = Math.floor(Math.random() * 10) + 3;
-                taskOutputs.push(`⚔️ 擊殺任務：全隊本局累積擊殺總數需達到 【${kills} 殺】`);
+                taskOutputs.push(`⚔️ 天才騷年：全隊本局累積擊殺總數需達到 【${kills} 殺】`);
             } else if (taskNum === 3) {
-                const res = getWeightedItem(["12格大紅", "9格大紅", "6格紅", "任意紅"], [40, 30, 20, 10]);
-                taskOutputs.push(`💎 撤離任務：全隊本局需要成功帶出至少一個【${res}】`);
+                const res = getWeightedItem(["12格大紅", "9格大紅", "6格紅", "任意紅"], [25, 45, 20, 10]);
+                taskOutputs.push(`💎 塞滿褲襠：全隊本局需要成功帶出至少一個【${res}】`);
             } else if (taskNum === 4) {
                 const res = getWeightedItem(["100發", "150發", "180發", "240發"], [40, 30, 20, 10]);
-                taskOutputs.push(`🎒 後勤限制：子彈攜帶量上限調整為【每人共 ${res}】(其餘放倉庫)`);
+                taskOutputs.push(`🎒 顆秒or火力壓制：子彈攜帶量上限調整為【每人共 ${res}】`);
             } else if (taskNum === 5) {
                 const res = getWeightedItem(["回血用藥品", "止痛類藥品", "手術包", "止血類藥品"], [25, 25, 25, 25]);
-                taskOutputs.push(`🚫 醫療限制：整局【禁止攜帶與使用：${res}】`);
+                taskOutputs.push(`🚫 極致身法：整局【禁止攜帶與使用：${res}】`);
             } else if (taskNum === 6) {
                 const res = getWeightedItem(["防彈衣修復包", "頭盔修復包", "全部頭盔與護甲修復包"], [50, 30, 20]);
-                taskOutputs.push(`🛠️ 維修限制：整局【禁止攜帶與使用：${res}】`);
+                taskOutputs.push(`🛠️ 奪舍敵方頭甲：整局【禁止攜帶與使用：${res}】`);
             } else if (taskNum === 7) {
-                const res = getWeightedItem(["體能針", "M2負重針", "戰鬥興奮劑", "腎上腺素"], [25, 25, 25, 25]);
-                taskOutputs.push(`🧪 科技限制：整局【禁止攜帶與使用：${res}】`);
+                const res = getWeightedItem(["體能針", "M2負重針", "戰鬥興奮劑", "腎上腺素", "紫聽針", "藍聽針", "M1負重針", "體能活化針"], [20, 15, 20, 5, 10, 5, 20]);
+                taskOutputs.push(`🧪激發玩家潛能 不依靠針劑：整局【禁止攜帶與使用：${res}】`);
             } else if (taskNum === 8) {
                 const res = getWeightedItem(["禁止改槍", "禁止裝瞄具", "只能最多裝5個藍色配件", "只能最多裝5個綠色配件", "只能最多裝4個紫色配件"], [30, 10, 20, 20, 20]);
-                taskOutputs.push(`🔧 武器改裝限制：整局【限制：${res}】`);
+                taskOutputs.push(`🔧 裸槍即是巔峰：整局【限制：${res}】`);
             }
         });
 
-        let html = `<div class="challenge-title">⚠️ 全隊共享挑戰任務 (自選是否挑戰)</div>`;
+        let html = `<div class="challenge-title">⚠️ 全隊共享挑戰任務 </div>`;
         taskOutputs.forEach(t => { html += `<div class="challenge-item">${t}</div>`; });
         document.getElementById('challenge_display').innerHTML = html;
     }
@@ -831,7 +831,7 @@
             html += generalTexts;
 
             if (pData.skipGun) {
-                html += `• 武器配置 ➔ 🚫 跑刀模式 (免抽槍彈)\n`;
+                html += `• 武器配置 ➔ 🚫 跑刀模式 \n`;
             } else {
                 if (mainGun) {
                     html += `• 槍 (主武器) ➔ ${mainGun} <span style="color:#e65100;font-weight:bold;">(${mainAmmo})</span>\n`;
