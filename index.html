@@ -570,7 +570,14 @@
 
         const titleLabel = document.getElementById('titleLabel');
         const displayLabel = document.getElementById('displayLabel');
-
+        // 🛠️ 強制修正：確保護航模式下的隊員絕對不會抽到跑刀
+    if (gameMode === "護航專屬" && !isBossTurn()) {
+        const playWheel = wheels.find(w => w.name === "玩法");
+        if (playWheel) {
+            playWheel.items = playWheel.items.filter(i => i !== "跑刀");
+        }
+    }
+        
         let currentWheel = wheels[currentWheelIndex];
         let items = currentWheel.items;
         
