@@ -370,12 +370,12 @@
     let isSpinning = false;
 
     let skipGunAndAmmoWheel = false;
-    
-    // 用物件來獨立紀錄主/副武器所抽到的子彈品質
     let currentTurnAmmoQualities = { "主武器": "不限制", "副武器": "不限制" };
+    
+    // 新增：用來紀錄目前子彈抽到第幾次
+    let ammoRollCounts = { "主武器": 0, "副武器": 0 };
 
     function getWeaponType(gunName) {
-        // 防止傳入帶有中括號格式的資料
         let cleanName = gunName.replace(/^\[.*?\]\s*/, "");
         for (const [type, guns] of Object.entries(weaponCategories)) {
             if (guns.includes(cleanName)) return type;
@@ -467,6 +467,7 @@
         results = [];
         skipGunAndAmmoWheel = false;
         currentTurnAmmoQualities = { "主武器": "不限制", "副武器": "不限制" };
+        ammoRollCounts = { "主武器": 0, "副武器": 0 };
         updateProgressText();
     }
 
@@ -481,9 +482,34 @@
 
     async function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+    // 【核心邏輯修正】檢查指定子彈品質在此次限制下是否有適用的合法槍枝
+    function checkHasValidGuns(ammoQuality) {
+        let baseWeaponPool = [];
+        selectedWeaponCategories.forEach(cat => {
+            baseWeaponPool = baseWeaponPool.concat(weaponCategories[cat]);
+        });
+
+        if (selectedMapCategory === "常規" || ["普壩", "長弓", "AZ3"].includes(sharedMap)) {
+            baseWeaponPool = baseWeaponPool.filter(gun => {
+                return ammoPools["白彈"].includes(gun) || ammoPools["綠彈"].includes(gun) || ammoPools["藍彈"].includes(gun);
+            });
+        }
+
+        let filtered = [];
+        if (ammoQuality === "不限制") {
+            filtered = baseWeaponPool.filter(gun => !["AWM", "M82"].includes(gun));
+        } else if (ammoQuality === "紅彈") {
+            filtered = baseWeaponPool.filter(gun => ammoPools["紅彈"].includes(gun));
+        } else {
+            filtered = baseWeaponPool.filter(gun => {
+                return ammoPools[ammoQuality].includes(gun) && !["AWM", "M82"].includes(gun);
+            });
+        }
+        return filtered.length > 0;
+    }
+
     async function startSpin() {
         if (isSpinning) return;
-
         if (wheels.length === 0) initPlayerStage();
 
         isSpinning = true;
@@ -495,65 +521,43 @@
 
         let currentWheel = wheels[currentWheelIndex];
         let items = currentWheel.items;
+        let titlePrefix = playerCount > 1 ? `【玩家 ${currentPlayer}】` : "";
 
+        // ================== 處理槍枝生成 ==================
         if (currentWheel.name.startsWith("槍")) {
-            // 判斷當前是處理主武器還是副武器
             let weaponSlot = currentWheel.name.includes("副武器") ? "副武器" : "主武器";
             let activeAmmoQuality = currentTurnAmmoQualities[weaponSlot];
+            let rollCount = ammoRollCounts[weaponSlot];
 
             let baseWeaponPool = [];
-            selectedWeaponCategories.forEach(cat => {
-                baseWeaponPool = baseWeaponPool.concat(weaponCategories[cat]);
-            });
+            selectedWeaponCategories.forEach(cat => { baseWeaponPool = baseWeaponPool.concat(weaponCategories[cat]); });
+
+            if (selectedMapCategory === "常規" || ["普壩", "長弓", "AZ3"].includes(sharedMap)) {
+                baseWeaponPool = baseWeaponPool.filter(gun => ammoPools["白彈"].includes(gun) || ammoPools["綠彈"].includes(gun) || ammoPools["藍彈"].includes(gun));
+            }
 
             let finalGunPool = [];
+            let isForceG17 = false;
 
-            // 1. 常規地圖或指定常規圖：強制過濾掉不支援白綠藍的槍枝
-            if (selectedMapCategory === "常規" || ["普壩", "長弓", "AZ3"].includes(sharedMap)) {
-                baseWeaponPool = baseWeaponPool.filter(gun => {
-                    return ammoPools["白彈"].includes(gun) || ammoPools["綠彈"].includes(gun) || ammoPools["藍彈"].includes(gun);
-                });
-            }
-
-            // 2. 根據目前對應的子彈檔次篩選
-            if (activeAmmoQuality === "不限制") {
-                // 不限制：絕對不可出現紅彈限定槍 AWM / M82
-                finalGunPool = baseWeaponPool.filter(gun => !["AWM", "M82"].includes(gun));
-            } 
-            else if (activeAmmoQuality === "紅彈") {
-                // 紅彈：直接匹配紅彈池（此時 AWM 和 M82 若符合武器類別就會在池中，與大家同機率）
-                finalGunPool = baseWeaponPool.filter(gun => ammoPools["紅彈"].includes(gun));
-            } 
-            else {
-                // 白、綠、藍、紫、金彈：匹配對應子彈池，且【絕對排除】AWM 與 M82
-                finalGunPool = baseWeaponPool.filter(gun => {
-                    const canUseAmmo = ammoPools[activeAmmoQuality].includes(gun);
-                    const isGodGun = ["AWM", "M82"].includes(gun);
-                    return canUseAmmo && !isGodGun;
-                });
-            }
-
-            // 3. 防呆安全機制：如果篩完是空的（例如常規圖限制配上不支援的組合）
-            if (finalGunPool.length === 0) {
-                // 擴大包容性：從自選類別中，盲抓一個符合目前子彈的非神槍
-                let backupPool = [];
-                selectedWeaponCategories.forEach(cat => { backupPool = backupPool.concat(weaponCategories[cat]); });
-                if (activeAmmoQuality !== "不限制" && activeAmmoQuality !== "紅彈") {
-                    finalGunPool = backupPool.filter(gun => ammoPools[activeAmmoQuality].includes(gun) && !["AWM", "M82"].includes(gun));
+            // 檢查是否因為滿 3 次不符而強制轉成 G17
+            if (rollCount >= 3 && !checkHasValidGuns(activeAmmoQuality)) {
+                isForceG17 = true;
+                finalGunPool = ["G17"];
+            } else {
+                if (activeAmmoQuality === "不限制") {
+                    finalGunPool = baseWeaponPool.filter(gun => !["AWM", "M82"].includes(gun));
+                } else if (activeAmmoQuality === "紅彈") {
+                    finalGunPool = baseWeaponPool.filter(gun => ammoPools["紅彈"].includes(gun));
                 } else {
-                    finalGunPool = backupPool.filter(gun => !["AWM", "M82"].includes(gun));
+                    finalGunPool = baseWeaponPool.filter(gun => ammoPools[activeAmmoQuality].includes(gun) && !["AWM", "M82"].includes(gun));
                 }
             }
 
-            if (finalGunPool.length === 0) {
-                finalGunPool = ["M4A1"]; // 極端防呆底線
-            }
-
             items = finalGunPool;
-            currentWheel.items = finalGunPool; 
+            currentWheel.items = finalGunPool;
         }
 
-        let titlePrefix = playerCount > 1 ? `【玩家 ${currentPlayer}】` : "";
+        // 修改標題文字顏色
         if (currentWheel.name === "地圖") {
             titleLabel.innerText = `【全隊共用】${currentWheel.name}`;
             titleLabel.style.color = "#FF9800";
@@ -565,6 +569,7 @@
             titleLabel.style.color = currentWheel.name.startsWith("子彈") ? "#FF9800" : "#009688";
         }
 
+        // 開始輪播動畫
         const totalSteps = 25;
         for (let i = 0; i < totalSteps; i++) {
             let tempChoice = items[Math.floor(Math.random() * items.length)];
@@ -576,14 +581,31 @@
 
         let finalChoice = items[Math.floor(Math.random() * items.length)];
 
+        // ================== 處理子彈結果 ==================
         if (currentWheel.name.startsWith("子彈")) {
             let weaponSlot = currentWheel.name.includes("副武器") ? "副武器" : "主武器";
-            currentTurnAmmoQualities[weaponSlot] = finalChoice; // 儲存至對應欄位
+            ammoRollCounts[weaponSlot]++; // 紀錄該位置抽取次數加 1
 
-            displayLabel.innerText = `✨ 子彈品質：${finalChoice} ✨`;
+            // 檢查該子彈是否能配對目前玩家指定的武器範圍
+            let hasValidWeapon = checkHasValidGuns(finalChoice);
+
+            if (!hasValidWeapon && ammoRollCounts[weaponSlot] < 3) {
+                // 如果不合，且還沒滿 3 次 ➔ 提示並直接自動幫玩家重新抽取！
+                displayLabel.innerText = `🔄 子彈[${finalChoice}]不支援所選武器，重抽中... (第 ${ammoRollCounts[weaponSlot]} 次)`;
+                displayLabel.style.color = "#d32f2f";
+                await sleep(1500);
+                isSpinning = false;
+                startSpin(); // 遞迴重抽
+                return;
+            }
+
+            // 滿 3 次或找到合法搭配 ➔ 定案
+            currentTurnAmmoQualities[weaponSlot] = finalChoice;
+            displayLabel.innerText = `✨ 子彈品質：${finalChoice} ✨ ${ammoRollCounts[weaponSlot] >= 3 && !hasValidWeapon ? '(強制防呆啟用)' : ''}`;
             displayLabel.style.color = "#FF9800";
             results.push([currentWheel.name, finalChoice]);
         } 
+        // ================== 處理槍枝結果 ==================
         else if (currentWheel.name.startsWith("槍")) {
             let wType = getWeaponType(finalChoice);
             let formattedGun = `[${wType}] ${finalChoice}`;
@@ -598,6 +620,7 @@
             results.push([currentWheel.name, finalChoice]);
         }
 
+        // 後續常規與絕密地圖規則判斷
         if (currentWheel.name === "地圖") {
             sharedMap = finalChoice;
             globalWheelsTemplate = wheels.filter(w => w.name !== "地圖");
@@ -844,6 +867,7 @@
         currentPlayer = 1; allPlayersResults = {}; sharedMap = null; globalWheelsTemplate = null;
         wheels = []; currentWheelIndex = 0; results = []; isSpinning = false; skipGunAndAmmoWheel = false;
         currentTurnAmmoQualities = { "主武器": "不限制", "副武器": "不限制" };
+        ammoRollCounts = { "主武器": 0, "副武器": 0 };
 
         document.getElementById('titleLabel').innerText = "配置已就緒";
         document.getElementById('titleLabel').style.color = "#333333";
