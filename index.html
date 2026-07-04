@@ -248,6 +248,7 @@
 
 <div id="app" class="container">
     <div id="control_zone">
+        <!-- 第 0 步：選擇遊玩模式 -->
         <fieldset class="player-frame" id="step_mode" style="display: block;">
             <legend>⭐ 選擇出裝房型</legend>
             <div class="radio-group">
@@ -257,6 +258,7 @@
             <div style="margin-top:12px;"><button type="button" class="confirm-btn" onclick="confirmGameMode()">確認房型模式</button></div>
         </fieldset>
 
+        <!-- 第一步：選擇人數 -->
         <fieldset class="player-frame" id="step_player">
             <legend>👥 第一步：選擇隊伍人數</legend>
             <div class="radio-group">
@@ -267,6 +269,7 @@
             <div style="margin-top:12px;"><button type="button" class="confirm-btn" onclick="confirmPlayerCount()">確認隊伍人數</button></div>
         </fieldset>
         
+        <!-- 第二步：地圖種類 -->
         <div id="map_zone">
             <fieldset class="player-frame" id="step_map">
                 <legend>🗺️ 第二步：選擇地圖種類</legend>
@@ -280,6 +283,7 @@
             </fieldset>
         </div>
 
+        <!-- 第三步：選擇武器種類 -->
         <div id="weapon_zone">
             <fieldset class="player-frame" id="step_weapon">
                 <legend>🔫 第三步：選擇武器種類範圍 (可複選)</legend>
@@ -297,6 +301,7 @@
             </fieldset>
         </div>
 
+        <!-- 第四步：選擇子彈限制 -->
         <div id="ammo_zone">
             <fieldset class="player-frame" id="step_ammo">
                 <legend>🔴 第四步：選擇子彈限制規則</legend>
@@ -311,6 +316,7 @@
             </fieldset>
         </div>
 
+        <!-- 第五步：轉盤主介面 -->
         <div id="wheel_zone">
             <hr style="border: 1px dashed #ccc; margin: 20px 0;">
             <h2 id="titleLabel">配置已就緒</h2>
@@ -322,6 +328,7 @@
         </div>
     </div>
 
+    <!-- 結果區塊 -->
     <div id="results_zone"></div>
 </div>
 
@@ -381,7 +388,7 @@
 
     let skipGunAndAmmoWheel = false;
     let currentTurnAmmoQualities = { "主武器": "不限制", "副武器": "不限制" };
-    let ammoRollCounts = { "主武器": 0, "副武器": 0 };
+    let ammoRollCounts = { "主武器": "副武器" };
 
     function getWeaponType(gunName) {
         let cleanName = gunName.replace(/^\[.*?\]\s*/, "");
@@ -488,12 +495,26 @@
             wheels = JSON.parse(JSON.stringify(globalWheelsTemplate));
         }
 
-        if (isBossTurn()) {
-            wheels = wheels.filter(w => w.name === "角色");
-            wheels.forEach(w => {
-                if (w.name === "角色") w.items = ["蝶", "蠱", "蜂醫"];
-            });
+        // 🛠️ 護航模式特定邏輯處理
+        if (gameMode === "護航專屬") {
+            if (isBossTurn()) {
+                // 老闆只抽專屬角色
+                wheels = wheels.filter(w => w.name === "角色");
+                wheels.forEach(w => {
+                    if (w.name === "角色") w.items = ["蝶", "蠱", "蜂醫"];
+                });
+            } else {
+                // 隊員部分：注入子彈池，並將玩法中的「跑刀」移除
+                const ammoWheel = wheels.find(w => w.name === "子彈");
+                if (ammoWheel) ammoWheel.items = generateAmmoPool();
+
+                const playWheel = wheels.find(w => w.name === "玩法");
+                if (playWheel) {
+                    playWheel.items = playWheel.items.filter(i => i !== "跑刀");
+                }
+            }
         } else {
+            // 普通模式：正常注入子彈池即可
             const ammoWheel = wheels.find(w => w.name === "子彈");
             if (ammoWheel) ammoWheel.items = generateAmmoPool();
         }
@@ -768,7 +789,6 @@
         }
     }
 
-    // 🛠️ 替換後的自訂任務代碼區塊
     function rollChallengeTasks() {
         const taskCount = Math.random() < 0.5 ? 1 : 2;
         const taskPool = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -809,7 +829,6 @@
                 const res = getWeightedItem(["防彈衣修復包", "頭盔修復包", "全部頭盔與護甲修復包"], [50, 30, 20]);
                 taskOutputs.push(`🛠️ 奪舍敵方頭甲：整局【禁止攜帶與使用：${res}】`);
             } else if (taskNum === 7) {
-                // 安全修正：傳入8個項目，必須有8個權重數值 (20+15+20+5+10+5+15+10 = 100)
                 const res = getWeightedItem(["體能針", "M2負重針", "戰鬥興奮劑", "腎上腺素", "紫聽針", "藍聽針", "M1負重針", "體能活化針"], [20, 15, 20, 5, 10, 5, 15, 10]);
                 taskOutputs.push(`🧪激發玩家潛能 不依靠針劑：整局【禁止攜帶與使用：${res}】`);
             } else if (taskNum === 8) {
