@@ -328,7 +328,6 @@
         "特殊武器": ["複合弓"]
     };
 
-    // 依據您提供的最新對應表完全同步
     const ammoPools = {
         "白彈": ["AR57", "MK47", "KC17", "CAR-15", "PTR-32", "AK-12", "SG552", "AUG", "M16A4", "K416", "AKS-74U", "AKM", "M4A1", "QCQ171", "勇士", "SMG-45", "野牛", "UZI", "Vector", "P90", "MP5", "FS-12", "725雙管", "S12K", "M1014", "SKS", "Mini-14", "M1911", "G17", "93R", "G18", "QSZ92G"],
         "綠彈": ["AR57", "MK47", "KC17", "騰龍", "CAR-15", "PTR-32", "G3", "SCAR-H", "AK-12", "SG552", "AUG", "M16A4", "K416", "AKS-74U", "AKM", "M4A1", "QCQ171", "勇士", "SMG-45", "野牛", "UZI", "Vector", "P90", "MP5", "FS-12", "725雙管", "S12K", "M1014", "QJB-201", "M249", "PKM", "PGS-1", "SR9", "SR-25", "SKS", "M14", "Mini-14", "M700", "R93", "M1911", "G17", "93R", "G18", "沙漠之鷹", ".357左輪", "QSZ92G"],
@@ -493,7 +492,6 @@
         let currentWheel = wheels[currentWheelIndex];
         let items = currentWheel.items;
 
-        // 【過濾系統】隨機抽取槍枝環節
         if (currentWheel.name.startsWith("槍")) {
             let baseWeaponPool = [];
             selectedWeaponCategories.forEach(cat => {
@@ -502,14 +500,12 @@
 
             let finalGunPool = [];
 
-            // 如果目前抽到的是常規地圖，強制過濾並移除只能打金、紫、紅彈的武器
             if (selectedMapCategory === "常規" || ["普壩", "長弓", "AZ3"].includes(sharedMap)) {
                 baseWeaponPool = baseWeaponPool.filter(gun => {
                     return ammoPools["白彈"].includes(gun) || ammoPools["綠彈"].includes(gun) || ammoPools["藍彈"].includes(gun);
                 });
             }
 
-            // 依據抽出的子彈品質，進行更精確的交叉篩選
             if (lastRolledAmmoQuality === "不限制") {
                 finalGunPool = baseWeaponPool.filter(gun => !["AWM", "M82"].includes(gun));
             } 
@@ -703,7 +699,8 @@
 
     function rollChallengeTasks() {
         const taskCount = Math.random() < 0.5 ? 1 : 2;
-        const taskPool = [1, 2, 3, 4, 5, 6, 7];
+        // 將隨機池擴展至 1 ~ 8，加入最新的武器改裝限制
+        const taskPool = [1, 2, 3, 4, 5, 6, 7, 8];
         const selectedTasks = [];
         while(selectedTasks.length < taskCount) {
             const randIdx = Math.floor(Math.random() * taskPool.length);
@@ -743,6 +740,9 @@
             } else if (taskNum === 7) {
                 const res = getWeightedItem(["體能針", "M2負重針", "戰鬥興奮劑", "腎上腺素"], [25, 25, 25, 25]);
                 taskOutputs.push(`🧪 科技限制：整局【禁止攜帶與使用：${res}】`);
+            } else if (taskNum === 8) {
+                const res = getWeightedItem(["禁止改槍", "禁止裝瞄具", "只能最多裝5個藍色配件", "只能最多裝5個綠色配件", "只能最多裝4個紫色配件"], [30, 10, 20, 20, 20]);
+                taskOutputs.push(`🔧 武器改裝限制：整局【限制：${res}】`);
             }
         });
 
@@ -751,6 +751,7 @@
         document.getElementById('challenge_display').innerHTML = html;
     }
 
+    // 後續函式保持不變...
     function showFinalResults() {
         document.getElementById('control_zone').style.display = "none";
         const app = document.getElementById('app');
